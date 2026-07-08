@@ -12,7 +12,9 @@ export default defineConfig({
     host_permissions: [],
   },
   imports: {
-    // Generate an ESLint 9 flat-config file exposing WXT's auto-imported globals.
+    // Emit a flat-config file (.wxt/eslint-auto-imports.mjs) exposing WXT's auto-imported
+    // globals. `9` is ESLint's flat-config format version (compatible with ESLint 9 and 10),
+    // not the ESLint major this project depends on.
     eslintrc: {
       enabled: 9,
     },
