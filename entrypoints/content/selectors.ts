@@ -42,16 +42,115 @@ export function findPostRoots(container: ParentNode): Element[] {
   return all.filter((el) => !all.some((other) => other !== el && other.contains(el)));
 }
 
-// ── Rich fields (CLASS-DEPENDENT — Phase B, fill during live recon) ──────────────────────────────
-// Intentionally empty until confirmed against real fixtures. Empty lists make every rich extractor
-// fail soft to its contract default, so Phase A stays correct (just sparse). See extract/index.ts.
-//
-// export const AUTHOR_NAME_SELECTORS = [...] as const;
-// export const AUTHOR_LINK_SELECTORS = [...] as const;
-// export const POST_TEXT_SELECTORS = [...] as const;
-// export const HASHTAG_SELECTORS = ['a[href*="/hashtag/"]'] as const;   // href path is STABLE
-// export const REACTION_COUNT_SELECTORS = [...] as const;
-// export const COMMENT_COUNT_SELECTORS = [...] as const;
-// export const TIMESTAMP_SELECTORS = [...] as const;
-// export const DEGREE_BADGE_SELECTORS = [...] as const;
-// export const SURFACE_HEADER_SELECTORS = [...] as const;
+// ── Rich fields (Phase B) ────────────────────────────────────────────────────────────────────────
+// ⚠️ PROVISIONAL: the class-based entries (`update-components-*`, `feed-shared-*`,
+// `social-details-social-counts`) are LinkedIn's long-standing families but are NOT yet confirmed
+// against the live 2026 DOM. Each list is ordered stable-anchor-first (href path / aria / role /
+// hidden-accessible text) so it degrades even if a class drifts; the live recon confirms/replaces
+// the class entries (a one-file diff) and swaps the synthetic test fixtures for real captures.
+
+/** The author ("actor") block containing name/headline/timestamp/degree. */
+export const ACTOR_CONTAINER_SELECTORS = [
+  '.update-components-actor',
+  '.update-components-actor--with-control-menu',
+] as const;
+
+/** The actor's profile link — the href PATH (`/in/` vs `/company/`) is the stable anchor. */
+export const AUTHOR_LINK_SELECTORS = [
+  'a[href*="/in/"]',
+  'a[href*="/company/"]',
+  'a[href*="/school/"]',
+] as const;
+
+/** The visible author name (LinkedIn duplicates it in an aria-hidden span). */
+export const AUTHOR_NAME_SELECTORS = [
+  '.update-components-actor__title span[aria-hidden="true"]',
+  '.update-components-actor__title',
+  '.update-components-actor__name',
+] as const;
+
+/** The author's headline / subtitle. */
+export const AUTHOR_TITLE_SELECTORS = [
+  '.update-components-actor__description',
+  '.update-components-actor__subtitle',
+] as const;
+
+/** The connection-degree badge text ("2nd", "· 2nd", "2e"). */
+export const DEGREE_BADGE_SELECTORS = [
+  '.update-components-actor__supplementary-actor-info',
+  '.update-components-actor__badge',
+  '.artdeco-entity-lockup__badge',
+] as const;
+
+/** The actor sub-description holding the relative timestamp + "Edited"/"Promoted"/"Suggested". */
+export const TIMESTAMP_SELECTORS = ['.update-components-actor__sub-description', 'time'] as const;
+
+/** The context header above a post ("X reposted this" / "X likes this"). */
+export const SURFACE_HEADER_SELECTORS = [
+  '.update-components-header',
+  '.update-components-header__text-view',
+  '.feed-shared-header',
+] as const;
+
+/** A nested (reshared) update embedded inside a quote-repost — carries the ORIGINAL post. */
+export const NESTED_UPDATE_SELECTORS = [
+  '.update-components-mini-update-v2',
+  '.update-components-update-v2__reshared-content',
+  '[data-urn^="urn:li:activity:"] [data-urn^="urn:li:activity:"]',
+] as const;
+
+/** The post body / commentary text. */
+export const POST_TEXT_SELECTORS = [
+  '.update-components-text',
+  '.feed-shared-update-v2__description',
+  '.update-components-update-v2__commentary',
+] as const;
+
+/** Hashtag anchors — the `/feed/hashtag/` (or `/hashtag/`) href path is STABLE. */
+export const HASHTAG_SELECTORS = ['a[href*="/hashtag/"]'] as const;
+
+/** The social-counts region (reactions on one side, comments/reposts on the other). */
+export const SOCIAL_COUNTS_SELECTORS = ['.social-details-social-counts'] as const;
+
+/** Reaction count — prefer the exact integer in an aria-label over abbreviated visible text. */
+export const REACTION_COUNT_SELECTORS = [
+  '[aria-label*="reaction" i]',
+  '.social-details-social-counts__reactions-count',
+  '.social-details-social-counts__count-value',
+] as const;
+
+/** Comment count — parsed separately from reactions and reposts. */
+export const COMMENT_COUNT_SELECTORS = [
+  'button[aria-label*="comment" i]',
+  'a[aria-label*="comment" i]',
+  '.social-details-social-counts__comments',
+] as const;
+
+/** Document/carousel or shared-article title. */
+export const MEDIA_TITLE_SELECTORS = [
+  '.update-components-article__title',
+  '.update-components-document__title',
+  '[data-test-document-title]',
+] as const;
+
+// post_type probes, checked in priority order (see extract/content.ts::classifyPostType).
+export const POLL_SELECTORS = ['.update-components-poll', '[data-test-poll]'] as const;
+export const DOCUMENT_SELECTORS = [
+  '.update-components-document',
+  '.document-s-container',
+  'iframe[title*="document" i]',
+] as const;
+export const VIDEO_SELECTORS = [
+  'video',
+  '.update-components-linkedin-video',
+  '[data-test-id="video"]',
+] as const;
+export const ARTICLE_SELECTORS = [
+  '.update-components-article',
+  '.update-components-entity',
+] as const;
+export const IMAGE_CONTAINER_SELECTORS = [
+  '.update-components-image',
+  '.feed-shared-image',
+] as const;
+export const IMAGE_SELECTORS = ['img'] as const;

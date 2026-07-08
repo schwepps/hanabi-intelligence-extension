@@ -12,7 +12,7 @@ export interface PostIdentity {
  * Returns null when no URN is resolvable — the caller skips the post (no dedup key possible).
  */
 export function extractIdentity(root: Element): PostIdentity | null {
-  const urn = readUrn(root);
+  const urn = readPostUrn(root);
   if (!urn) return null;
   return {
     linkedin_post_id: urn,
@@ -20,7 +20,8 @@ export function extractIdentity(root: Element): PostIdentity | null {
   };
 }
 
-function readUrn(root: Element): string | null {
+/** Cheap URN read (attribute + regex only) — used to pre-skip already-seen posts before full extraction. */
+export function readPostUrn(root: Element): string | null {
   for (const attr of POST_URN_ATTRS) {
     const match = root.getAttribute(attr)?.match(POST_URN_PATTERN);
     if (match) return match[0];

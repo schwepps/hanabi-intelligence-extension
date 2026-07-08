@@ -19,9 +19,12 @@ describe('parseLocalizedCount', () => {
     ['12 K', 12000],
     ['3,4 M', 3_400_000],
     ['2B', 2_000_000_000],
+    ['3,4 Tsd.', 3400], // German thousands abbreviation
     // exact aria-label form ("<int> <word>") — trailing word ignored
     ['1,234 reactions', 1234],
     ['12 comments', 12],
+    ['1.2K reactions', 1200], // abbreviation + trailing word
+    ['1 234 réactions', 1234], // French grouped integer + accented word
     // absence → null (never 0)
     ['', null],
     ['—', null], // em dash

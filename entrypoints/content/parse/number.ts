@@ -6,11 +6,14 @@
  * ("1.2K"). Returns `null` when no digits are present (absence ≠ zero — the caller decides the
  * 0-vs-null policy per field).
  *
- * Handled: grouping separators (`,` `.` and any Unicode whitespace incl. NBSP / narrow NBSP, which
- * JS `\s` matches; plus apostrophe) and K/M/B (+ locale variants mn/mio/mrd) with a decimal part.
+ * Strategy: take the FIRST numeric run (digits + grouping separators — `,` `.` any whitespace incl.
+ * NBSP, apostrophe). If a multiplier letter (k/m/b + locale variants) immediately follows, treat
+ * the number as a decimal and scale it; otherwise it's a grouped integer and any trailing word
+ * (e.g. "réactions", "comments") is ignored.
  */
 const MULTIPLIERS: Record<string, number> = {
   k: 1_000,
+  tsd: 1_000,
   m: 1_000_000,
   mn: 1_000_000,
   mio: 1_000_000,
@@ -20,28 +23,23 @@ const MULTIPLIERS: Record<string, number> = {
 
 export function parseLocalizedCount(raw: string | null | undefined): number | null {
   if (raw == null) return null;
+  const text = raw.trim().toLowerCase();
 
-  // Numeric token (digits + grouping/decimal separators) plus an optional letter suffix (K/M/B…).
-  const match = raw
-    .trim()
-    .toLowerCase()
-    .match(/([\d.,\s']+?)\s*([a-z]+)?$/);
-  if (!match) return null;
+  const numMatch = text.match(/\d[\d.,\s']*/);
+  if (!numMatch) return null;
+  const numToken = numMatch[0];
 
-  const numberPart = match[1];
-  if (numberPart == null) return null;
-  const suffix = match[2] ?? '';
-  const multiplier = MULTIPLIERS[suffix];
+  const after = text.slice((numMatch.index ?? 0) + numToken.length);
+  const multKey = after.match(/^\s*(k|tsd|m|mn|mio|b|mrd)\b/)?.[1];
+  const multiplier = multKey ? MULTIPLIERS[multKey] : undefined;
 
   if (multiplier != null) {
-    // Abbreviated form: the numeric part is a small decimal ("1,2" / "1.2" → 1.2).
-    const normalized = numberPart.replace(/[\s']/g, '').replace(',', '.');
+    const normalized = numToken.replace(/[\s']/g, '').replace(',', '.');
     const value = Number.parseFloat(normalized);
     return Number.isNaN(value) ? null : Math.round(value * multiplier);
   }
 
-  // Full integer with grouping separators — strip everything that isn't a digit.
-  const digits = numberPart.replace(/\D/g, '');
+  const digits = numToken.replace(/\D/g, '');
   if (digits === '') return null;
   const value = Number.parseInt(digits, 10);
   return Number.isNaN(value) ? null : value;

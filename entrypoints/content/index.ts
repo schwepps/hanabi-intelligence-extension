@@ -4,6 +4,7 @@ import { sendPostCaptured } from '@/shared/messages';
 import { CaptureController } from './capture-controller';
 import { queryFirst } from './dom';
 import { assemblePost } from './extract';
+import { readPostUrn } from './extract/identity';
 import { isFeedUrl, watchFeed } from './gate';
 import { FEED_CONTAINER_SELECTORS, findPostRoots } from './selectors';
 
@@ -20,6 +21,7 @@ export default defineContentScript({
       findPostRoots: (container) => findPostRoots(container),
       extract: (root) => assemblePost(root),
       emit: (payload) => sendPostCaptured(payload),
+      readId: (root) => readPostUrn(root),
     });
 
     // Capture runs only when BOTH the sensor is on the feed AND consent was granted (default off).

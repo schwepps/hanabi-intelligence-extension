@@ -12,6 +12,8 @@ export interface CaptureControllerDeps {
   extract: (root: Element) => PostPayload | null;
   /** Emit a captured payload (e.g. send it to the background). */
   emit: (payload: PostPayload) => void;
+  /** Cheap id read to pre-skip already-seen posts before the expensive full extraction. */
+  readId?: (root: Element) => string | null;
   /** Observer debounce (ms); defaults to the observer module's tuned value. */
   debounceMs?: number;
   /** Bounded wait for the container to appear; injected in tests. */
@@ -63,6 +65,10 @@ export class CaptureController {
 
   private sweep(container: Element): void {
     for (const root of this.deps.findPostRoots(container)) {
+      // Cheap pre-skip: virtualized scroll re-surfaces the same nodes constantly, so avoid the
+      // expensive full extraction for posts already emitted this session.
+      const preId = this.deps.readId?.(root);
+      if (preId != null && this.seen.has(preId)) continue;
       try {
         const payload = this.deps.extract(root);
         if (!payload) continue;
