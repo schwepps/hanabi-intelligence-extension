@@ -1,8 +1,9 @@
 # Hanabi Radar — Extension
 
 Browser extension that **passively** captures LinkedIn feed posts for the Hanabi
-collective. It only reads what a logged-in "sensor" (capteur) already sees while
-scrolling — **no automation, no clicks, no private data**. Captured posts are forwarded
+collective. It only reads what a logged-in "sensor" — a collective member running the
+extension — already sees while scrolling. **No automation, no clicks, no private data.**
+Captured posts are forwarded
 to the Hanabi backend (separate repo `Hanabi-app`).
 
 Built with [WXT](https://wxt.dev) (Manifest V3, Chromium target) in strict TypeScript.
