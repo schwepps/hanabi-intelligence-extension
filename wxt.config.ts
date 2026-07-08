@@ -7,8 +7,10 @@ export default defineConfig({
     description:
       'Passively captures LinkedIn feed posts for the Hanabi collective. Read-only, no automation.',
     // Minimal by design: a declared content-script `matches` is enough to inject.
+    // `storage` backs the consent flag (see shared/consent.ts) — capture stays off until the
+    // sensor opts in (FSC-111 adds the UI). No host/`tabs`/broad grant.
     // `host_permissions` for the ingestion API are added when the send-queue lands.
-    permissions: [],
+    permissions: ['storage'],
     host_permissions: [],
   },
   imports: {
