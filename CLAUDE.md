@@ -38,13 +38,17 @@ Before a PR: `pnpm lint && pnpm typecheck && pnpm build` must pass.
 - **Type-first messaging**: define message types (content → background) first. All logic flows from there.
 - ⚠️ **Debounce the feed's `MutationObserver`** (LinkedIn is infinite scroll) — otherwise performance collapses. Start around **~800 ms** and tune.
 - **DOM reading in P0** (fast); intercepting the internal Voyager API is the robustness target (post-MVP). Do not over-invest in DOM parsing before the concept is validated.
-- **The payload contract is the source of truth and lives in the `Hanabi-app` repo (ticket FSC-98)**: `linkedin_post_id`, `text`, `author_name`, displayed `author_company`/`author_title`, `posted_at`, `url`, engagement. Conform to it strictly; do not invent fields.
+- **The payload contract is the source of truth and lives in the `Hanabi-app` repo (ticket FSC-98)**. Per post: `linkedin_post_id`, `text`, `url`, `author_name`, `author_company`, `author_title`, `author_profile_url`, `author_type`, `post_type`, `is_repost`, `original_author_name`, `original_author_profile_url`, `media_title`, `hashtags[]`, `reaction_count`, `comment_count`, `posted_at_raw`, `captured_at`, `author_degree`, `social_proof`. Conform strictly; do not invent fields.
+- **Capture `post_type`** (text | image | multi_image | video | document | poll | article). Document/carousel and video posts hold their substance outside the text — without the format, the classifier bins them as noise.
+- **Reposts**: detect them and extract the _original_ author, not the resharer. Otherwise outreach targets the wrong person.
+- **Two warm-intro paths** — capture both: the author's connection degree relative to the sensor (`author_degree`), and, when the post surfaced because a 1st-degree connection engaged with it, that person's name (`social_proof`). Neither can be reconstructed later.
+- **Timestamps**: LinkedIn renders relative times ("2h", "1d"). Send `posted_at_raw` + `captured_at`; the backend derives `posted_at`.
 - **Environment-configurable backend**: the dev build targets the local backend (Docker / local Supabase stack), the distribution build targets the hosted EU backend. Select via WXT modes/env vars — **never hardcode the endpoint**.
 
 ## Guardrails (critical)
 
 - **Capture is strictly passive.** No automated action on LinkedIn: no auto-scroll, no clicks, no login, no message sending. We read what the sensor already sees.
-- **No private data.** Never capture messages, notifications, or the connection graph. Only public posts from the feed.
+- **No private data.** Never capture messages, notifications, or the connection graph. Only what LinkedIn already renders on a feed post. Nuance: reading the degree badge ("2nd") shown next to an author **is** allowed — that's one enum for one visible post. **Enumerating the sensor's connections is not.** Never crawl the connections list to resolve degrees.
 - **Consent before capture.** On first launch, a screen explaining what is captured, the purpose, and opt-out; capture only starts after explicit agreement (ticket FSC-111).
 - **Minimal permissions** in the manifest: limit to `linkedin.com`. No broad permission (`<all_urls>`, `tabs`…) without real need. Prefer targeted injection.
 - **Secrets out of code**: endpoint and public keys via config/env, never a backend secret in the extension.
