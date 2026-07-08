@@ -1,42 +1,43 @@
 import { consentGranted } from '@/shared/consent';
 import { logDebug } from '@/shared/log';
 import { sendPostCaptured } from '@/shared/messages';
-import { CaptureController } from './capture-controller';
-import { queryFirst } from './dom';
-import { assemblePost } from './extract';
-import { readPostUrn } from './extract/identity';
+import { postControl, readBridgeMessage } from '@/shared/window-bridge';
+import { DedupStore } from './dedup';
 import { isFeedUrl, watchFeed } from './gate';
-import { FEED_CONTAINER_SELECTORS, findPostRoots } from './selectors';
 
 export default defineContentScript({
   // Site-wide match is intentional: LinkedIn is an SPA, so a content script injects once on
-  // document load and persists across client-side navigation. Narrowing `matches` to /feed/*
-  // would miss the feed when the sensor first lands on another page and then navigates to it.
-  // Feed-only scoping is enforced at RUNTIME (the isFeedUrl gate below) together with consent —
-  // we never read messaging, notifications or the connection graph.
+  // document load and persists across client-side navigation. Feed-only scoping is enforced at
+  // RUNTIME (the isFeedUrl gate) together with consent — we never read messaging, notifications
+  // or the connection graph.
   matches: ['https://www.linkedin.com/*'],
   main() {
-    const controller = new CaptureController({
-      findContainer: () => queryFirst(document, FEED_CONTAINER_SELECTORS),
-      findPostRoots: (container) => findPostRoots(container),
-      extract: (root) => assemblePost(root),
-      emit: (payload) => sendPostCaptured(payload),
-      readId: (root) => readPostUrn(root),
+    // The MAIN-world reader (feed-reader.ts) extracts posts (it can read React props for the URN);
+    // this isolated script owns consent + the feed gate, dedups, and forwards to the background.
+    const seen = new DedupStore();
+    let enabled = false;
+
+    window.addEventListener('message', (event) => {
+      const message = readBridgeMessage(event);
+      if (!message) return;
+      if (message.kind === 'hello') {
+        postControl(enabled); // reader just loaded — tell it the current state
+        return;
+      }
+      if (message.kind === 'capture' && enabled) {
+        for (const payload of message.posts) {
+          if (seen.add(payload.linkedin_post_id)) sendPostCaptured(payload);
+        }
+      }
     });
 
-    // Capture runs only when BOTH the sensor is on the feed AND consent was granted (default off).
-    let capturing = false;
+    // Capture runs only when BOTH on the feed AND consent granted (default off, safe by default).
     const evaluate = async (): Promise<void> => {
       const shouldCapture = isFeedUrl(location.href) && (await consentGranted.getValue());
-      if (shouldCapture && !capturing) {
-        capturing = true;
-        logDebug('capture: starting (on feed, consent granted)');
-        await controller.start();
-      } else if (!shouldCapture && capturing) {
-        capturing = false;
-        logDebug('capture: stopping (left feed or consent revoked)');
-        controller.stop();
-      }
+      if (shouldCapture === enabled) return;
+      enabled = shouldCapture;
+      logDebug(enabled ? 'capture: enabled (on feed, consent granted)' : 'capture: disabled');
+      postControl(enabled);
     };
 
     void evaluate();
