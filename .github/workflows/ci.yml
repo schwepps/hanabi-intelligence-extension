@@ -4,6 +4,15 @@ on:
   push:
   pull_request:
 
+# Least-privilege token: this pipeline only reads the repo (no writes or publishes).
+permissions:
+  contents: read
+
+# Cancel superseded runs on the same ref (e.g. rapid pushes to a branch or its PR).
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   quality:
     name: Lint · Typecheck · Test · Build
@@ -28,6 +37,9 @@ jobs:
 
       - name: Lint
         run: pnpm lint
+
+      - name: Format check
+        run: pnpm format:check
 
       - name: Typecheck
         run: pnpm typecheck

@@ -1,6 +1,5 @@
 # CLAUDE.md — Hanabi-extension
 
-> Copy to the root of the `Hanabi-extension` repo as `CLAUDE.md`.
 > Concise by design (~100 lines): the linter owns style, this file owns commands, architecture, and guardrails.
 
 ## Context
@@ -11,7 +10,7 @@ Model inspired by Tarss: **no automation** — we only read what the user alread
 
 Full spec: see `docs/Hanabi-Radar-Documentation-MVP.md`. Tickets: Linear, team FSC Consulting, label `Hanabi-extension`.
 
-("capteur" = sensor: a collective member who has the extension installed and captures their feed.)
+("sensor" = a collective member who has the extension installed and captures their feed. Matches the `sensors` table in `Hanabi-app`.)
 
 ## Stack
 
@@ -39,7 +38,8 @@ Before a PR: `pnpm lint && pnpm typecheck && pnpm build` must pass.
 - **Type-first messaging**: define message types (content → background) first. All logic flows from there.
 - ⚠️ **Debounce the feed's `MutationObserver`** (LinkedIn is infinite scroll) — otherwise performance collapses. Start around **~800 ms** and tune.
 - **DOM reading in P0** (fast); intercepting the internal Voyager API is the robustness target (post-MVP). Do not over-invest in DOM parsing before the concept is validated.
-- **The payload contract is the source of truth and lives in the `Hanabi-app` repo (ticket FSC-98)**: `linkedin_post_id`, text, author, displayed company/title, date, url, engagement. Conform to it strictly; do not invent fields.
+- **The payload contract is the source of truth and lives in the `Hanabi-app` repo (ticket FSC-98)**: `linkedin_post_id`, `text`, `author_name`, displayed `author_company`/`author_title`, `posted_at`, `url`, engagement. Conform to it strictly; do not invent fields.
+- **Environment-configurable backend**: the dev build targets the local backend (Docker / local Supabase stack), the distribution build targets the hosted EU backend. Select via WXT modes/env vars — **never hardcode the endpoint**.
 
 ## Guardrails (critical)
 

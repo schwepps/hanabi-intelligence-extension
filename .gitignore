@@ -13,3 +13,8 @@ stats.html
 # Local / editor
 *.local
 .DS_Store
+
+# Secrets / env — WXT reads .env natively; endpoint & keys stay local only
+.env
+.env.*
+!.env.example
