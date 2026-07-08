@@ -1,12 +1,15 @@
-import type { AuthorType, PostType } from '@/shared/payload';
+import type { AuthorType, CommentSignal, PostType } from '@/shared/payload';
 import { cleanText, queryAll, queryText } from '../dom';
 import { parseLocalizedCount } from '../parse/number';
 import {
   AUTHOR_LINK_SELECTORS,
   COMMENT_COUNT_PATTERN,
+  COMMENT_LIST_SELECTOR,
+  ENGAGEMENT_SURFACE_PATTERN,
   HASHTAG_SELECTORS,
   POST_TEXT_SELECTORS,
   REACTION_COUNT_PATTERN,
+  REPOST_SURFACE_PATTERN,
   VIDEO_SELECTORS,
 } from './selectors';
 
@@ -25,9 +28,15 @@ export interface AuthorInfo {
  * Author identity — the warm-intro core. The actor block has an avatar link (no text) and a
  * name link (text) both pointing at the profile; we take the first link WITH text as the name,
  * and its href as the profile URL. `/company/` → company, else person.
+ *
+ * Links inside `excludeHeader` (a social-proof context header) and inside embedded comment threads
+ * are skipped, so on a surfaced post the author is the real poster — not the surfacing connection
+ * (whose link comes first) or a commenter.
  */
-export function extractAuthor(post: Element): AuthorInfo {
-  const links = queryAll(post, AUTHOR_LINK_SELECTORS);
+export function extractAuthor(post: Element, excludeHeader?: Element | null): AuthorInfo {
+  const links = queryAll(post, AUTHOR_LINK_SELECTORS).filter(
+    (a) => !a.closest(COMMENT_LIST_SELECTOR) && !(excludeHeader && excludeHeader.contains(a)),
+  );
   const nameLink = links.find((a) => cleanText(a.textContent) !== null) ?? null;
   const link = nameLink ?? links[0] ?? null;
 
@@ -36,6 +45,85 @@ export function extractAuthor(post: Element): AuthorInfo {
   const name = cleanText(nameLink?.textContent) ?? cleanText(link?.getAttribute('aria-label'));
 
   return { name, profile_url, type };
+}
+
+export interface SurfaceHeader {
+  el: Element;
+  /** `engagement` → a connection liked/commented (social proof); `repost` → a reshare. */
+  kind: 'engagement' | 'repost';
+  /** The surfacing connection's name (for engagement) / resharer (for repost). */
+  name: string | null;
+}
+
+/**
+ * The context header above a post ("<Connection> a aimé ceci" / "… a republié"), or null for a
+ * plain authored post. Anchored on localized VERB TEXT (durable), skipping the body text box and
+ * embedded comments. Drives social_proof (engagement) and is_repost (repost), and lets the author
+ * extractor ignore the surfacing connection's link.
+ */
+export function findSurfaceHeader(post: Element): SurfaceHeader | null {
+  for (const node of post.querySelectorAll('span, div, a')) {
+    if (node.childElementCount > 4 || node.closest(COMMENT_LIST_SELECTOR)) continue;
+    if (node.querySelector('[data-testid="expandable-text-box"]')) continue; // the post/comment body
+    const text = cleanText(node.textContent);
+    if (!text || text.length > 90) continue;
+    const kind = ENGAGEMENT_SURFACE_PATTERN.test(text)
+      ? 'engagement'
+      : REPOST_SURFACE_PATTERN.test(text)
+        ? 'repost'
+        : null;
+    if (!kind) continue;
+    return { el: node, kind, name: surfaceName(node, text) };
+  }
+  return null;
+}
+
+/** Visible preview comments (commenter identity + text) — an engagement/warm-intro signal. */
+export function extractComments(post: Element): CommentSignal[] {
+  const comments: CommentSignal[] = [];
+  const seen = new Set<Element>();
+  for (const list of post.querySelectorAll(COMMENT_LIST_SELECTOR)) {
+    for (const box of list.querySelectorAll('[data-testid="expandable-text-box"]')) {
+      const container = commentContainer(box, list);
+      if (!container || seen.has(container)) continue;
+      seen.add(container);
+      const link = container.querySelector('a[href*="/in/"]');
+      comments.push({
+        author_name: shortName(
+          cleanText(link?.textContent) ?? cleanText(link?.getAttribute('aria-label')),
+        ),
+        author_profile_url: normalizeProfileUrl(link?.getAttribute('href')),
+        text: cleanText(box.textContent),
+      });
+    }
+  }
+  return comments;
+}
+
+function surfaceName(header: Element, text: string): string | null {
+  const linked = shortName(cleanText(header.querySelector('a[href*="/in/"]')?.textContent));
+  if (linked) return linked;
+  const match = text.match(
+    /^(.{2,60}?)\s+(?:a |aime|likes|commented|celebrates|loves|reacted|reposted|recommande)/i,
+  );
+  return match ? cleanText(match[1]) : null;
+}
+
+/** Smallest ancestor of a comment's text box (within the list) that carries a commenter link. */
+function commentContainer(box: Element, list: Element): Element | null {
+  let node = box.parentElement;
+  while (node && node !== list && list.contains(node)) {
+    if (node.querySelector('a[href*="/in/"]')) return node;
+    node = node.parentElement;
+  }
+  return null;
+}
+
+/** Keep the leading name segment (commenter links can trail degree/headline). */
+function shortName(name: string | null | undefined): string | null {
+  if (!name) return null;
+  const head = name.split(/[·•|]/)[0];
+  return cleanText(head)?.slice(0, 80) ?? null;
 }
 
 export interface Counts {

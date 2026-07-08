@@ -57,6 +57,19 @@ export interface PostPayload {
   author_degree: AuthorDegree;
   /** Name of the 1st-degree connection whose engagement surfaced the post. Per-sensor signal. */
   social_proof: string | null;
+  /**
+   * Visible preview comments on the post — a warm-intro signal (who engaged, and how). Empty when
+   * none are rendered. ⚠️ CONTRACT EXTENSION beyond the original FSC-98 field list: mirror this in
+   * `Hanabi-app` (likely a related `item_comments` / per-sensor table) before relying on it.
+   */
+  comments: CommentSignal[];
+}
+
+/** A single visible comment under a feed post (commenter identity + text). */
+export interface CommentSignal {
+  author_name: string | null;
+  author_profile_url: string | null;
+  text: string | null;
 }
 
 /**

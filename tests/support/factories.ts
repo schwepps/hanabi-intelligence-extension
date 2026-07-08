@@ -24,6 +24,7 @@ export function stubPayload(
     captured_at: '2026-01-01T00:00:00.000Z',
     author_degree: 'none',
     social_proof: null,
+    comments: [],
     ...overrides,
   };
 }

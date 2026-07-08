@@ -24,6 +24,7 @@ const PAYLOAD_KEYS = [
   'captured_at',
   'author_degree',
   'social_proof',
+  'comments',
 ].sort();
 
 const post = () =>

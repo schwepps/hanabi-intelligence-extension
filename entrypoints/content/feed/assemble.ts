@@ -2,9 +2,11 @@ import type { PostPayload } from '@/shared/payload';
 import {
   classifyPostType,
   extractAuthor,
+  extractComments,
   extractCounts,
   extractHashtags,
   extractText,
+  findSurfaceHeader,
 } from './fields';
 
 export interface AssembleContext {
@@ -17,10 +19,13 @@ export interface AssembleContext {
  * props in the MAIN world). Returns null when the URN is missing — no dedup key ⇒ skip.
  *
  * Production-confidence fields (validated against the live feed): linkedin_post_id, url,
- * author_name/profile_url/type, text, reaction_count, comment_count, hashtags, post_type (video +
- * image/multi_image). Best-effort / deferred fields default here and are hardened in later passes:
- * author_company, author_title, posted_at_raw, author_degree, social_proof, repost provenance,
- * media_title, and document/poll/article post_type.
+ * author_name/profile_url/type, text, reaction_count, hashtags, post_type (video), social_proof
+ * (from an engagement context header), and comments. Best-effort / deferred fields default here and
+ * are hardened in later passes: author_company, author_title, posted_at_raw, author_degree,
+ * comment_count, repost provenance (original author), media_title, and non-video post_type.
+ *
+ * The surface header is resolved first: it feeds social_proof + is_repost AND is excluded from the
+ * author scan, so on a surfaced post the author is the poster, not the surfacing connection.
  */
 export function assemblePost(
   post: Element,
@@ -29,7 +34,8 @@ export function assemblePost(
 ): PostPayload | null {
   if (!urn) return null;
 
-  const author = extractAuthor(post);
+  const header = findSurfaceHeader(post);
+  const author = extractAuthor(post, header?.el);
   const counts = extractCounts(post);
 
   return {
@@ -43,7 +49,7 @@ export function assemblePost(
     author_company: null,
     author_title: null,
     post_type: classifyPostType(post),
-    is_repost: false,
+    is_repost: header?.kind === 'repost',
     original_author_name: null,
     original_author_profile_url: null,
     media_title: null,
@@ -52,6 +58,7 @@ export function assemblePost(
     comment_count: counts.comment_count,
     posted_at_raw: null,
     author_degree: 'none',
-    social_proof: null,
+    social_proof: header?.kind === 'engagement' ? header.name : null,
+    comments: extractComments(post),
   };
 }
