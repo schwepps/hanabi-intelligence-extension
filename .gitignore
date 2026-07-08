@@ -1,0 +1,20 @@
+node_modules
+
+# WXT build output & generated files
+.output
+.wxt
+
+# Packaged extension
+*.zip
+
+# WXT bundle analysis
+stats.html
+
+# Local / editor
+*.local
+.DS_Store
+
+# Secrets / env — WXT reads .env natively; endpoint & keys stay local only
+.env
+.env.*
+!.env.example
