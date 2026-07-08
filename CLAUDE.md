@@ -38,9 +38,18 @@ contract live in `Hanabi-app` (contract = ticket FSC-98).
 
 ## Architecture
 
-- **Content script** (`entrypoints/content/`): reads posts on the feed, extracts the payload,
-  forwards it to the background. Injected site-wide (LinkedIn is an SPA) — gate to the feed at
-  **runtime** via `window.location`, not by narrowing manifest `matches`.
+- **Feed is Server-Driven UI (2026).** The feed is a virtualized `LazyColumn` under
+  `[data-testid="mainFeed"]`; the classic `feed-shared-*` / `update-components-*` / `data-urn` markup
+  is gone and no client surface exposes a clean data model. Capture reads the _rendered_ feed across
+  two worlds (see `README.md` → "How capture works"):
+- **MAIN-world reader** (`entrypoints/feed-reader.content.ts`, `world: 'MAIN'`, `document_idle`): runs
+  in the page context to read each post's activity URN (dedup key) from the node's **React props** —
+  it is in no DOM attribute — plus the other fields from the rendered DOM. Relays slim payloads over a
+  `window.postMessage` bridge (`shared/window-bridge.ts`).
+- **Content script** (`entrypoints/content/`, isolated): owns consent + the feed gate, de-dups by
+  post id, forwards to the background. Injected site-wide (LinkedIn is an SPA) — gate to the feed at
+  **runtime** via `window.location`, not by narrowing manifest `matches`. The fragile DOM knowledge
+  is isolated in `content/feed/selectors.ts` + `feed/react-urn.ts` so a LinkedIn change is a localized fix.
 - **Background service worker** (`entrypoints/background/`): send queue → ingestion API, with
   sensor auth and retry/backoff.
   - ⚠️ **MV3 workers are ephemeral** (they stop when idle). Never hold the queue in memory:
@@ -49,11 +58,14 @@ contract live in `Hanabi-app` (contract = ticket FSC-98).
 - **Typed messaging** (content → background): define the message contract first — WXT ships no
   messaging wrapper, so use `browser.runtime` or a typed lib like `@webext-core/messaging`. All
   logic flows from the contract.
-- ⚠️ **Debounce the feed's `MutationObserver`** (infinite scroll): start ~800 ms and tune, or
-  performance collapses.
-- **Capture strategy**: DOM reading in P0 (fast). Robustness target (post-MVP) = intercept
-  LinkedIn's internal **Voyager** API by injecting a `world: 'MAIN'` script (`injectScript`) that
-  hooks `fetch`/XHR. Don't over-invest in DOM parsing before the concept is validated.
+- ⚠️ **Debounce the feed's `MutationObserver`** (infinite scroll): ~800 ms (`content/observer.ts`),
+  or performance collapses.
+- **Capture strategy (validated against the live SDUI feed).** Extract from the _rendered_ DOM +
+  the React-props URN — NOT from the raw network payload. The feed streams a React-Server-Components
+  "flight" of `proto.sdui.*` UI components (TextModels/bindings), not data entities, so parsing it is
+  _more_ brittle than reading the browser-resolved DOM. **Ground every selector in live recon** (drive
+  the sensor's own feed read-only); treat class names as untrusted and anchor on `data-testid` /
+  `aria-label` / href paths / localized verb text. Add fields only when validated on the live feed.
 - **Env-configurable backend**: dev build → local backend (Docker / local Supabase), distribution
   build → hosted EU backend. Select via WXT modes + `import.meta.env`. **Never hardcode the endpoint.**
 
@@ -73,6 +85,18 @@ Per post: `linkedin_post_id`, `text`, `url`, `author_name`, `author_company`, `a
   Neither is reconstructable later.
 - **Timestamps**: LinkedIn shows relative times ("2h", "1d"). Send `posted_at_raw` + `captured_at`;
   the backend derives `posted_at`.
+- **Comments (extension beyond FSC-98's original list — coordinate before relying on it):** visible
+  preview comments are captured as `comments[]` (`{ author_name, author_profile_url, text }`) — a
+  warm-intro signal (who engaged, and how). Mirror this in `Hanabi-app`; FSC-111 consent copy must
+  cover commenter data.
+- **Field confidence on the 2026 SDUI feed** (validated live): production-grade = `linkedin_post_id`
+  (+ derived `url`), author name/profile_url/type, `text`, `reaction_count`, `hashtags`,
+  `social_proof`, `comments`, `post_type=video`. Best-effort/deferred (default until a durable anchor
+  lands) = `comment_count`, `author_degree`, `posted_at_raw`, repost provenance (`is_repost` is set
+  from the surface header; `original_author_*` deferred), `author_company`/`title`, `media_title`, and
+  non-video `post_type`. `social_proof` comes from the context header ("X a aimé/commenté ceci") and
+  the author is taken from the actor block excluding that header, so a surfaced post attributes to the
+  poster, not the surfacing connection.
 
 ## Guardrails (critical)
 
