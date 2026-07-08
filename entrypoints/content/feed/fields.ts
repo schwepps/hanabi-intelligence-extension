@@ -3,10 +3,10 @@ import { cleanText, queryAll, queryText } from '../dom';
 import { parseLocalizedCount } from '../parse/number';
 import {
   AUTHOR_LINK_SELECTORS,
-  COMMENT_LABEL_PATTERN,
+  COMMENT_COUNT_PATTERN,
   HASHTAG_SELECTORS,
   POST_TEXT_SELECTORS,
-  REACTION_LABEL_PATTERN,
+  REACTION_COUNT_PATTERN,
   VIDEO_SELECTORS,
 } from './selectors';
 
@@ -44,35 +44,40 @@ export interface Counts {
 }
 
 /**
- * Reaction and comment counts, read from resolved `aria-label`s (the browser renders the SDUI
- * bindings into labels like "1,234 reactions" / "56 comments"). Defaults to 0. First numeric match
- * per kind wins; the comment aria-label is matched separately from reactions/reposts.
+ * Reaction and comment counts. On the live feed these render as localized VISIBLE TEXT
+ * ("1 234 réactions", "56 commentaires") — not aria-labels — so we scan short leaf-ish elements
+ * (span/button/a), skip embedded comment threads, and take the first match per kind. Defaults to 0.
+ * Reaction coverage is high; a numeric comment count is not always rendered (then it stays 0).
  */
 export function extractCounts(post: Element): Counts {
   let reaction: number | null = null;
   let comment: number | null = null;
-  for (const el of post.querySelectorAll('[aria-label]')) {
-    const label = el.getAttribute('aria-label') ?? '';
-    if (!/\d/.test(label)) continue;
-    if (reaction == null && REACTION_LABEL_PATTERN.test(label))
-      reaction = parseLocalizedCount(label);
-    else if (comment == null && COMMENT_LABEL_PATTERN.test(label))
-      comment = parseLocalizedCount(label);
+  for (const node of post.querySelectorAll('span, button, a')) {
+    if (node.closest('[data-testid*="commentList" i]')) continue;
+    const text = cleanText(node.textContent);
+    if (!text || text.length > 40) continue;
+    if (reaction == null) {
+      const match = REACTION_COUNT_PATTERN.exec(text);
+      if (match?.[1]) reaction = parseLocalizedCount(match[1]);
+    }
+    if (comment == null) {
+      const match = COMMENT_COUNT_PATTERN.exec(text);
+      if (match?.[1]) comment = parseLocalizedCount(match[1]);
+    }
+    if (reaction != null && comment != null) break;
   }
   return { reaction_count: reaction ?? 0, comment_count: comment ?? 0 };
 }
 
 /**
- * post_type from rendered structural signals (best-effort — the SDUI DOM has no clean type marker).
- * Video is reliable (`<video>`); image vs multi_image counts CONTENT images (excluding avatars in
- * author links and images inside embedded comment lists). document/poll/article need markers not
- * yet confirmed on the live feed → they currently fall through to image/text and are a known gap.
+ * post_type. `<video>` is the one reliable structural marker on the SDUI feed, so we detect video
+ * and default everything else to `text`. Distinguishing image / multi_image / document / poll /
+ * article needs a content-media container anchor that isn't confirmed yet — counting `<img>`s
+ * over-reports multi_image (avatars, face-piles, entity thumbnails), and a wrong media type misleads
+ * the classifier more than a conservative `text`. Richer media typing is a tracked follow-up.
  */
 export function classifyPostType(post: Element): PostType {
   if (post.querySelector(VIDEO_SELECTORS.join(','))) return 'video';
-  const contentImages = [...post.querySelectorAll('img')].filter((img) => isContentImage(img));
-  if (contentImages.length >= 2) return 'multi_image';
-  if (contentImages.length === 1) return 'image';
   return 'text';
 }
 
@@ -84,13 +89,6 @@ export function extractHashtags(post: Element): string[] {
     if (tag && !tags.includes(tag)) tags.push(tag);
   }
   return tags;
-}
-
-function isContentImage(img: Element): boolean {
-  // Exclude author avatars (inside a profile link) and images inside embedded comment threads.
-  if (img.closest('a[href*="/in/"], a[href*="/company/"]')) return false;
-  if (img.closest('[data-testid*="commentList" i]')) return false;
-  return true;
 }
 
 function normalizeProfileUrl(href: string | null | undefined): string | null {

@@ -32,8 +32,8 @@ const post = () =>
       <a href="https://www.linkedin.com/in/ada/" aria-label="Ada"><img alt="" /></a>
       <a href="https://www.linkedin.com/in/ada/"><span>Ada Lovelace</span></a>
       <div data-testid="expandable-text-box">We are hiring</div>
-      <button aria-label="42 reactions">👍</button>
-      <button aria-label="7 comments">💬</button>
+      <span>42 reactions</span>
+      <a>7 comments</a>
     </div>`);
 
 const ctx = { now: () => '2026-07-08T12:00:00.000Z' };

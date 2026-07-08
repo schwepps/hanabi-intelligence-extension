@@ -58,16 +58,28 @@ describe('extractText', () => {
 });
 
 describe('extractCounts', () => {
-  it('reads reaction and comment counts from resolved aria-labels', () => {
+  it('reads localized (French) counts from visible text', () => {
     const post = fragment(`
       <div>
-        <button aria-label="1,234 reactions">👍</button>
-        <button aria-label="56 comments">💬</button>
+        <span>1 234 réactions</span>
+        <button><span>56 commentaires</span></button>
       </div>`);
     expect(extractCounts(post)).toEqual({ reaction_count: 1234, comment_count: 56 });
   });
+  it('reads English counts too', () => {
+    const post = fragment('<div><span>1,234 reactions</span><a>56 comments</a></div>');
+    expect(extractCounts(post)).toEqual({ reaction_count: 1234, comment_count: 56 });
+  });
+  it('ignores counts inside embedded comment threads', () => {
+    const post = fragment(`
+      <div>
+        <span>10 réactions</span>
+        <div data-testid="commentList-abc"><span>999 réactions</span></div>
+      </div>`);
+    expect(extractCounts(post).reaction_count).toBe(10);
+  });
   it('defaults to 0 when counts are absent', () => {
-    expect(extractCounts(fragment('<div><button aria-label="Like">👍</button></div>'))).toEqual({
+    expect(extractCounts(fragment('<div><span>Aimer</span></div>'))).toEqual({
       reaction_count: 0,
       comment_count: 0,
     });
@@ -75,21 +87,11 @@ describe('extractCounts', () => {
 });
 
 describe('classifyPostType', () => {
-  it('detects video', () => {
+  it('detects video (the one reliable structural marker)', () => {
     expect(classifyPostType(fragment('<div><video></video></div>'))).toBe('video');
   });
-  it('counts content images, ignoring avatars inside author links', () => {
-    const post = fragment(`
-      <div>
-        <a href="https://www.linkedin.com/in/x/"><img alt="avatar" /></a>
-        <img alt="content-1" /><img alt="content-2" />
-      </div>`);
-    expect(classifyPostType(post)).toBe('multi_image');
-  });
-  it('single content image → image', () => {
-    expect(classifyPostType(fragment('<div><img alt="c" /></div>'))).toBe('image');
-  });
-  it('no media → text', () => {
+  it('conservatively returns text for non-video (image typing is a documented gap)', () => {
+    expect(classifyPostType(fragment('<div><img alt="c1" /><img alt="c2" /></div>'))).toBe('text');
     expect(classifyPostType(fragment('<div><p>hello</p></div>'))).toBe('text');
   });
 });

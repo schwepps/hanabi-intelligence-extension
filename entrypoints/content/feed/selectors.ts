@@ -27,6 +27,11 @@ export const HASHTAG_SELECTORS = ['a[href*="/hashtag/"]'] as const;
 /** Native video player marker for post_type. */
 export const VIDEO_SELECTORS = ['video'] as const;
 
-/** Aria-label fragments that mark an engagement COUNT element (localized). */
-export const REACTION_LABEL_PATTERN = /(reaction|réaction|\blike|j.?aime)/i;
-export const COMMENT_LABEL_PATTERN = /(comment|commentaire)/i;
+/**
+ * Engagement counts render as VISIBLE TEXT (not aria-labels) and are localized — e.g.
+ * "1 234 réactions", "56 commentaires". Each pattern captures the leading number for
+ * parseLocalizedCount. `\s` matches the NBSP / narrow-NBSP LinkedIn uses as a group separator.
+ */
+export const REACTION_COUNT_PATTERN =
+  /(\d[\d.,\s']*)\s*(?:réactions?|reactions?|j.?aime|likes?)\b/i;
+export const COMMENT_COUNT_PATTERN = /(\d[\d.,\s']*)\s*(?:commentaires?|comments?)\b/i;
