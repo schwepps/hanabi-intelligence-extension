@@ -1,0 +1,5 @@
+.wxt
+.output
+node_modules
+pnpm-lock.yaml
+.context

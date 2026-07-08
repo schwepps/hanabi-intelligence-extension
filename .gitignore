@@ -1,0 +1,15 @@
+node_modules
+
+# WXT build output & generated files
+.output
+.wxt
+
+# Packaged extension
+*.zip
+
+# WXT bundle analysis
+stats.html
+
+# Local / editor
+*.local
+.DS_Store
