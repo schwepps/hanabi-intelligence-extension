@@ -1,0 +1,243 @@
+/* Onboarding / consent screen — Hanabi "Daybreak" tokens (assets/tokens.css). Mobile-first. */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: var(--hb-font-sans);
+  font-size: var(--hb-text-body);
+  line-height: var(--hb-text-body-leading);
+  color: var(--hb-ink);
+  background: var(--hb-canvas);
+}
+
+.hb-page {
+  min-height: 100svh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+}
+
+.hb-card {
+  width: 100%;
+  max-width: 640px;
+  background: var(--hb-surface);
+  border: 1px solid var(--hb-border);
+  border-radius: var(--hb-radius-card);
+  box-shadow: var(--hb-shadow-card);
+  padding: 24px;
+}
+
+.hb-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.hb-brand-mark {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  background-image: var(--hb-gradient-brand-mark);
+}
+
+.hb-brand-word {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.hb-brand-word-accent {
+  color: var(--hb-brand);
+}
+
+.hb-title {
+  font-size: var(--hb-text-h1);
+  font-weight: var(--hb-text-h1-weight);
+  letter-spacing: var(--hb-text-h1-tracking);
+  margin: 0 0 8px;
+}
+
+.hb-intro {
+  color: var(--hb-text-mid);
+  margin: 0 0 20px;
+}
+
+.hb-cols {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.hb-h2 {
+  font-size: var(--hb-text-h2);
+  font-weight: var(--hb-text-h2-weight);
+  margin: 0 0 8px;
+}
+
+.hb-list {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--hb-text-mid);
+}
+
+.hb-list li {
+  margin-bottom: 4px;
+}
+
+.hb-note {
+  color: var(--hb-text-low);
+  font-size: var(--hb-text-body-sm);
+  margin: 8px 0 0;
+}
+
+.hb-why {
+  color: var(--hb-text-mid);
+  background: var(--hb-surface-sunken);
+  border-radius: var(--hb-radius-lg);
+  padding: 12px 14px;
+  margin: 0 0 20px;
+}
+
+.hb-form {
+  border-top: 1px solid var(--hb-border-faint);
+  padding-top: 20px;
+}
+
+.hb-field {
+  display: block;
+  margin-bottom: 10px;
+}
+
+.hb-field-label {
+  display: block;
+  font-size: var(--hb-text-body-sm);
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.hb-input {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 12px;
+  font-size: var(--hb-text-body);
+  font-family: var(--hb-font-mono);
+  color: var(--hb-ink);
+  background: var(--hb-field);
+  border: 1px solid var(--hb-border-soft);
+  border-radius: var(--hb-radius-md);
+  outline: none;
+}
+
+.hb-input:focus {
+  border-color: var(--hb-brand);
+}
+
+.hb-btn {
+  min-height: 44px;
+  padding: 0 16px;
+  font-family: inherit;
+  font-size: var(--hb-text-body-sm);
+  font-weight: 600;
+  border-radius: var(--hb-radius-md);
+  border: 1px solid transparent;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: background-color 0.15s ease;
+}
+
+.hb-btn:active {
+  transform: scale(0.99);
+}
+
+.hb-btn:disabled {
+  cursor: not-allowed;
+  color: var(--hb-text-disabled);
+  background: var(--hb-surface-sunken);
+  border-color: var(--hb-border);
+}
+
+.hb-btn-primary {
+  color: #fff;
+  background: var(--hb-brand);
+  width: 100%;
+  margin-top: 12px;
+}
+
+.hb-btn-primary:not(:disabled):hover {
+  background: var(--hb-brand-hover);
+}
+
+.hb-btn-secondary {
+  color: var(--hb-ink);
+  background: var(--hb-surface);
+  border-color: var(--hb-border-strong);
+}
+
+.hb-btn-secondary:not(:disabled):hover {
+  background: var(--hb-surface-sunken);
+}
+
+.hb-status {
+  font-size: var(--hb-text-body-sm);
+  color: var(--hb-danger);
+  margin: 8px 0 0;
+  min-height: 1em;
+}
+
+.hb-identity {
+  font-size: var(--hb-text-body-sm);
+  color: var(--hb-success);
+  background: var(--hb-surface-sunken);
+  border-radius: var(--hb-radius-md);
+  padding: 10px 12px;
+  margin: 12px 0 0;
+}
+
+.hb-consent {
+  margin-top: 16px;
+}
+
+.hb-check {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  font-size: var(--hb-text-body-sm);
+  color: var(--hb-text-mid);
+  cursor: pointer;
+}
+
+.hb-check input {
+  margin-top: 3px;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  accent-color: var(--hb-brand);
+}
+
+.hb-success {
+  border-top: 1px solid var(--hb-border-faint);
+  padding-top: 20px;
+  color: var(--hb-text-mid);
+}
+
+.hb-success .hb-h2 {
+  color: var(--hb-success);
+}
+
+@media (min-width: 560px) {
+  .hb-card {
+    padding: 32px;
+  }
+
+  .hb-cols {
+    grid-template-columns: 1fr 1fr;
+  }
+}

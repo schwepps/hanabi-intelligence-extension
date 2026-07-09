@@ -1,0 +1,115 @@
+/* Toolbar popup — Hanabi "Daybreak" tokens (assets/tokens.css). */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: var(--hb-font-sans);
+  color: var(--hb-ink);
+  background: var(--hb-surface);
+}
+
+.hb-popup {
+  width: 300px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.hb-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hb-brand-mark {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background-image: var(--hb-gradient-brand-mark);
+}
+
+.hb-brand-word {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.hb-brand-word-accent {
+  color: var(--hb-brand);
+}
+
+.hb-state {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: var(--hb-surface-sunken);
+  border-radius: var(--hb-radius-lg);
+  padding: 12px;
+}
+
+.hb-dot {
+  width: 10px;
+  height: 10px;
+  margin-top: 5px;
+  flex-shrink: 0;
+  border-radius: var(--hb-radius-pill);
+  background: var(--hb-text-low);
+}
+
+.hb-dot-on {
+  background: var(--hb-success);
+}
+
+.hb-status-label {
+  margin: 0;
+  font-size: var(--hb-text-body);
+  font-weight: 600;
+}
+
+.hb-detail {
+  margin: 2px 0 0;
+  font-size: var(--hb-text-body-sm);
+  color: var(--hb-text-mid);
+}
+
+.hb-btn {
+  min-height: 40px;
+  padding: 0 14px;
+  font-family: inherit;
+  font-size: var(--hb-text-body-sm);
+  font-weight: 600;
+  border-radius: var(--hb-radius-md);
+  border: 1px solid transparent;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: background-color 0.15s ease;
+}
+
+.hb-btn:active {
+  transform: scale(0.99);
+}
+
+.hb-btn-primary {
+  color: #fff;
+  background: var(--hb-brand);
+}
+
+.hb-btn-primary:hover {
+  background: var(--hb-brand-hover);
+}
+
+.hb-btn-ghost {
+  color: var(--hb-text-mid);
+  background: transparent;
+}
+
+.hb-btn-ghost:hover {
+  color: var(--hb-ink);
+  background: var(--hb-surface-sunken);
+}

@@ -1,0 +1,162 @@
+/* ============================================================================
+   HANABI DESIGN TOKENS — "Daybreak" (single light theme, no switcher)
+   ----------------------------------------------------------------------------
+   SOURCE OF TRUTH for the brand's visual language. Framework-neutral: plain CSS
+   custom properties + @keyframes ONLY. Do NOT add Tailwind directives here — the
+   Tailwind mapping lives in globals.css (@theme inline). Keeping this file pure
+   CSS is what lets it be copied VERBATIM into the Hanabi-extension repo (FSC-111
+   consent screen); there is no shared package, so the two copies are synced by
+   hand. Values are pre-checked for WCAG AA on their intended backgrounds — do not
+   re-tune hexes when transcribing.
+   ============================================================================ */
+
+:root {
+  /* --- Foundation ---------------------------------------------------------- */
+  --hb-canvas: #f6f5f1; /* app background */
+  --hb-surface: #ffffff; /* cards, bars, rails */
+  --hb-surface-sunken: #efede6; /* chips, inset fields */
+  --hb-page: #eeece5; /* behind surfaces */
+  --hb-ink: #16202e; /* headings, summaries (text-hi) */
+  --hb-text-mid: #566475; /* secondary text */
+  --hb-text-low: #8a96a5; /* meta, placeholders */
+  --hb-border: #e5e2da; /* hairlines */
+  --hb-border-strong: #d8d4cb; /* stronger dividers, secondary button */
+
+  /* --- Brand --------------------------------------------------------------- */
+  --hb-brand: #1f4fd6;
+  --hb-brand-hover: #1a45be;
+  --hb-brand-tint: #e7eefb;
+  --hb-gradient-brand-mark: radial-gradient(
+    circle at 30% 30%,
+    #2e6be6,
+    #1f4fd6 60%,
+    #143a9c
+  );
+
+  /* --- Streams (equal peers — hue only, never ranked; solid + tint) -------- */
+  --hb-stream-signal: #2563c9;
+  --hb-stream-signal-tint: #e7eefb;
+  --hb-stream-opportunity: #12886a;
+  --hb-stream-opportunity-tint: #e1f1eb;
+  --hb-stream-trend: #7c4dd6;
+  --hb-stream-trend-tint: #f1ecfa;
+
+  /* --- Heat (one warm-rising scale — NO gold; text / chip-bg / swatch) ----- */
+  --hb-heat-cold-text: #5f6b7d;
+  --hb-heat-cold-bg: #edeff2;
+  --hb-heat-cold: #7c8aa0;
+  --hb-heat-warm-text: #b57534;
+  --hb-heat-warm-bg: #fbeedf;
+  --hb-heat-warm: #e39a55;
+  --hb-heat-hot-text: #c0322e;
+  --hb-heat-hot-bg: #fbe7e6;
+  --hb-heat-hot: #d64541;
+
+  /* --- Spark (warm-path signal — gold is RESERVED, used nowhere else) ------ */
+  --hb-spark: #e0a21e; /* indicator dot */
+  --hb-spark-text: #8a6209; /* text on tint */
+  --hb-spark-glyph: #b07d0c; /* glyph / label */
+  --hb-spark-bg: #fdf4dc; /* badge background */
+  --hb-spark-border: #ebcb77; /* badge border */
+
+  /* --- Status -------------------------------------------------------------- */
+  --hb-success: #12886a;
+  --hb-warning: #e39a55;
+  --hb-danger: #d64541;
+  --hb-info: #2563c9;
+
+  /* --- Typography — stacks (the extension consumes these directly) --------- */
+  --hb-font-sans: 'Figtree', system-ui, sans-serif;
+  --hb-font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  /* --- Typography — scale (size + companion weight/leading/tracking) ------- */
+  --hb-text-display: 30px;
+  --hb-text-display-weight: 800;
+  --hb-text-display-tracking: -0.02em;
+  --hb-text-h1: 24px;
+  --hb-text-h1-weight: 700;
+  --hb-text-h1-tracking: -0.01em;
+  --hb-text-h2: 18px;
+  --hb-text-h2-weight: 700;
+  --hb-text-body: 15px;
+  --hb-text-body-weight: 500;
+  --hb-text-body-leading: 1.45;
+  --hb-text-body-sm: 13px;
+  --hb-text-body-sm-weight: 500;
+  --hb-text-meta: 11px;
+  --hb-text-meta-weight: 400;
+  --hb-text-overline: 10px;
+  --hb-text-overline-weight: 600;
+  --hb-text-overline-tracking: 0.14em;
+
+  /* --- Radius -------------------------------------------------------------- */
+  --hb-radius-sm: 4px; /* inputs / small */
+  --hb-radius-md: 8px; /* buttons, fields */
+  --hb-radius-lg: 11px; /* inner panels */
+  --hb-radius-card: 14px;
+  --hb-radius-modal: 18px;
+  --hb-radius-surface: 22px;
+  --hb-radius-pill: 999px;
+
+  /* --- Elevation ----------------------------------------------------------- */
+  --hb-shadow-card: 0 1px 3px rgba(20, 30, 45, 0.05);
+  --hb-shadow-raised: 0 4px 12px -2px rgba(20, 30, 45, 0.1);
+  --hb-shadow-overlay: 0 24px 60px -16px rgba(20, 30, 45, 0.4);
+
+  /* --- Extended UI shades (component-level values from the handoff) --------- */
+  --hb-border-faint: #edeae2; /* inner dividers (card footer, modal sections) */
+  --hb-border-soft: #dfdbd2; /* chip / input hairlines */
+  --hb-border-tab: #e1ded6; /* tabs baseline */
+  --hb-surface-muted: #fbfaf7; /* empty-state / modal-footer fill */
+  --hb-field: #f4f2ed; /* search field fill */
+  --hb-track: #e9e6df; /* segmented-control track */
+  --hb-brand-border: #9ebbf3; /* selected filter-chip outline */
+  --hb-success-border: #bee3d3; /* success/processed pill outline */
+  --hb-text-faint: #98a2b0; /* author suffix, card dates */
+  --hb-text-disabled: #a6b0bd; /* disabled control text */
+  --hb-chip-text: #3a4756; /* domain-chip label */
+  --hb-overlay-scrim: rgba(22, 32, 46, 0.44); /* modal backdrop */
+  --hb-seen-1: #c9d6ea; /* seen-by avatar stack */
+  --hb-seen-2: #b3c5e2;
+  --hb-seen-3: #9db4d9;
+}
+
+/* --- Keyframes (simple; durations are applied per-use) --------------------- */
+
+/* live dots + NEW dot */
+@keyframes hb-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.3;
+    transform: scale(0.65);
+  }
+}
+
+/* one-time diagonal sweep across a freshly-arrived card */
+@keyframes hb-sheen {
+  0% {
+    opacity: 0;
+  }
+  14% {
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* banner + modal enter */
+@keyframes hb-drop {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
