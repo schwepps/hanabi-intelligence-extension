@@ -8,9 +8,10 @@ beyond what a feed post renders.** Captured posts are forwarded to the Hanabi ba
 
 Built with [WXT](https://wxt.dev) (Manifest V3, Chromium target) in strict TypeScript.
 
-> Status: **feed capture implemented** (FSC-110) against LinkedIn's 2026 Server-Driven-UI
-> feed. Capture is **off by default** and starts only after consent (FSC-111 adds the UI).
-> The background send-queue to the ingestion API is a later ticket.
+> Status: **feed capture** (FSC-110), **onboarding + consent** (FSC-111), and the **authenticated
+> send-queue** (FSC-112) are implemented against LinkedIn's 2026 Server-Driven-UI feed. Capture is
+> **off by default** and starts only after the sensor consents; captured posts are queued in the
+> background worker and POSTed to the ingestion API with retry/backoff and dedup.
 
 ## Prerequisites
 
@@ -37,15 +38,22 @@ pnpm dev
 WXT builds the extension, launches a fresh Chrome instance with it already loaded, and
 hot-reloads on change. Log into LinkedIn in that instance and open the feed.
 
-Capture is gated on consent (safe by default). To exercise it before the FSC-111
-onboarding screen exists, set the flag from the extension's **service-worker** devtools
-console:
+**Onboarding** opens automatically on first install: paste a sensor token, which the extension
+validates against the backend and then records consent. This requires the ingestion backend
+(`Hanabi-app`) running locally on `http://127.0.0.1:3000` with a seeded sensor row (matching
+`token_hash`, `active`, consented). Once linked and consented, scrolling the feed captures posts,
+which the background worker batches and POSTs to `/api/ingest` — watch the Network tab / backend, or
+the `[hanabi]` service-worker logs.
+
+To smoke-test **capture only** without a backend, flip the consent flag from the extension's
+**service-worker** devtools console:
 
 ```js
 chrome.storage.local.set({ 'hanabi:consentGranted': true });
 ```
 
-Captured posts are logged by the background worker (`[hanabi] captured …`).
+Posts are still captured and enqueued; sends fail and retry (with backoff) until a backend is
+reachable — nothing is lost.
 
 ### Option B — load an unpacked build manually
 
@@ -94,7 +102,15 @@ localized fix.
 
 ```
 entrypoints/
-  background/index.ts          # service worker: receives captures (send-queue is a later ticket)
+  background/                  # service worker (MV3)
+    index.ts                   #   wiring only: onInstalled + send-queue triggers (capture/alarm/consent)
+    install.ts                 #   open onboarding on first install
+    queue.ts                   #   durable FIFO queue (storage.local) + write mutex
+    sent-ids.ts                #   persistent already-sent set (dedup across restarts)
+    send.ts                    #   authenticated batch POST + response classification
+    drain.ts                   #   drain state machine (batching, retry, opt-out abort)
+    backoff.ts                 #   exponential backoff + persisted failure streak
+    scheduler.ts               #   browser.alarms retry seam
   content/index.ts             # ISOLATED: consent + feed gate, dedup, forward to background
   feed-reader.content.ts       # MAIN world: React-props URN + rendered-DOM fields → bridge
   content/
@@ -108,20 +124,27 @@ entrypoints/
     dedup.ts                   # per-tab dedup by post id
     observer.ts                # debounced MutationObserver helper
     parse/                     # localized number + degree parsers
+  onboarding/                  # first-launch consent screen + sensor-token linking (FSC-111)
+  popup/                       # capture on/off toggle + link status
 shared/
-  payload.ts                   # PostPayload + CommentSignal (contract SSOT)
+  payload.ts                   # PostPayload + CommentSignal (capture contract SSOT)
+  ingestion.ts                 # wire envelope + toIngestPost allowlist (strips comments)
+  sensor-api.ts                # backend client: token validation + consent (fetch + Bearer)
+  identity.ts                  # storage-backed sensor identity (token + profile)
+  consent.ts                   # storage-backed consent flag (default off)
+  backend.ts                   # backend origin by build mode (single source)
   messages.ts                  # typed content → background messaging
   window-bridge.ts             # MAIN ↔ ISOLATED postMessage protocol
-  consent.ts                   # storage-backed consent flag (default off)
   log.ts                       # '[hanabi]' logging
-wxt.config.ts                  # manifest (permissions: ['storage']) + WXT config
+wxt.config.ts                  # manifest (permissions: ['storage', 'alarms']) + zip placeholder guard
 ```
 
 ## Quality gates
 
 - **ESLint (flat config) + Prettier** — formatting and linting are enforced by tooling.
-- **Vitest** — the extraction logic is pure and unit-tested (happy-dom for DOM fixtures,
-  `fakeBrowser` for messaging). Selectors are validated against the live feed, not snapshot-tested.
+- **Vitest** — extraction logic and the background send-queue are unit-tested (happy-dom for DOM
+  fixtures, `fakeBrowser` for storage/alarms/messaging, stubbed `fetch` for the ingestion client).
+  Selectors are validated against the live feed, not snapshot-tested.
 - **commitlint + husky + lint-staged** — non-conforming commit messages or staged code are
   blocked before commit. Commits follow [Conventional Commits](https://www.conventionalcommits.org/).
 - **CI** (GitHub Actions) runs lint, typecheck, test and build on every push and PR.

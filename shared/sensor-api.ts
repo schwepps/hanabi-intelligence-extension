@@ -6,7 +6,9 @@
  *
  * MUST be called from a privileged extension context (the onboarding page or the background worker)
  * that holds `host_permissions` for the backend origin — the backend sets no CORS headers, so a
- * content-script call would fail. The send-queue (later ticket) reuses this module from the background.
+ * content-script call would fail. The send-queue does its own authenticated POST from
+ * `entrypoints/background/send.ts`, following this same Bearer / `backendOrigin(import.meta.env.PROD)`
+ * idiom (kept separate because it returns a never-throwing outcome union rather than throwing).
  */
 import { backendOrigin } from './backend';
 
