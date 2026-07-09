@@ -22,7 +22,7 @@
  *     MAIN↔ISOLATED node correlation.
  */
 import { isLinkedInUrl } from '@/shared/linkedin-url';
-import type { PostPayload } from '@/shared/payload';
+import { AUTHOR_DEGREES, AUTHOR_TYPES, POST_TYPES, type PostPayload } from '@/shared/payload';
 
 export const BRIDGE_SOURCE = 'hanabi-feed-bridge';
 
@@ -97,6 +97,15 @@ function isNullableLinkedInUrl(value: unknown): boolean {
   return value === null || isLinkedInUrl(value);
 }
 
+/** Membership in an `as const` enum tuple (the cast lets `.includes` take an `unknown`). */
+function isMember<T extends string>(tuple: readonly T[], value: unknown): boolean {
+  return typeof value === 'string' && (tuple as readonly string[]).includes(value);
+}
+
+function isNullableString(value: unknown): boolean {
+  return value === null || typeof value === 'string';
+}
+
 function isValidComment(value: unknown): boolean {
   if (typeof value !== 'object' || value === null) return false;
   const comment = value as Record<string, unknown>;
@@ -140,6 +149,15 @@ export function isValidCapturedPost(value: unknown): value is PostPayload {
     isValidRepostProvenance(post) &&
     isCount(post.reaction_count) &&
     isCount(post.comment_count) &&
+    // Enums (FSC-116/117): reject an out-of-enum value that would 422 the whole batch.
+    isMember(AUTHOR_TYPES, post.author_type) &&
+    isMember(POST_TYPES, post.post_type) &&
+    isMember(AUTHOR_DEGREES, post.author_degree) &&
+    // Best-effort strings (FSC-116/118): nullable, but never a non-string.
+    isNullableString(post.author_company) &&
+    isNullableString(post.author_title) &&
+    isNullableString(post.media_title) &&
+    isNullableString(post.posted_at_raw) &&
     Array.isArray(post.hashtags) &&
     post.hashtags.every((tag) => typeof tag === 'string') &&
     Array.isArray(post.comments) &&

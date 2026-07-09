@@ -30,6 +30,31 @@ export const HASHTAG_SELECTORS = ['a[href*="/hashtag/"]'] as const;
 export const VIDEO_SELECTORS = ['video'] as const;
 
 /**
+ * A LinkedIn "document" post (multi-page PDF / slide carousel) renders a page-navigation control whose
+ * button aria-labels name the document — FR "…page suivante du document", "Page 1 sur 8" ("document"
+ * is spelled the same in FR/EN). Validated live (2026 FR feed) on 2 document posts, incl. a locked
+ * "Déverrouiller tout le document" (nav buttons still present), and absent from ~20 non-document posts.
+ * HIGH confidence — required because a wrong post_type is permanent at ingest (first-capture-wins).
+ */
+export const DOCUMENT_SELECTOR = 'button[aria-label*="document" i]';
+
+/**
+ * A shared native article / newsletter renders a card linking to the article at `/pulse/…`. Anchored
+ * on the href PATH (locale-agnostic); the caller ignores a `/pulse/` link inside the post BODY, so only
+ * a standalone card marks an article share. Validated live on 2 article cards. Non-pulse external-link
+ * shares stay conservative `text` (an "amigoscode" post proved to be a plain image with the domain
+ * watermarked INTO the image — external-domain text is not a reliable article signal).
+ */
+export const ARTICLE_LINK_SELECTOR = 'a[href*="/pulse/"]';
+
+/**
+ * The document/carousel title renders as a badge "<title> · <N> pages" (e.g. "n8n et Claude · 8 pages",
+ * split across spans so the concatenated text may lack spaces). Anchored to END with the localized
+ * "N page(s)" tail so a larger container (badge + reactions) can't match; capture group 1 is the title.
+ */
+export const MEDIA_PAGES_PATTERN = /^(.+?)\s*[·•|]?\s*\d+\s*pages?$/i;
+
+/**
  * Engagement counts render as VISIBLE TEXT (not aria-labels) and are localized — e.g.
  * "1 234 réactions", "56 commentaires". Each pattern captures the leading number for
  * parseLocalizedCount. `\s` matches the NBSP / narrow-NBSP LinkedIn uses as a group separator.
@@ -40,6 +65,24 @@ export const COMMENT_COUNT_PATTERN = /(\d[\d.,\s']*)\s*(?:commentaires?|comments
 
 /** Embedded comment thread under a post. */
 export const COMMENT_LIST_SELECTOR = '[data-testid*="commentList" i]';
+
+/**
+ * The relative timestamp LinkedIn renders in the actor block ("16 h •", "15 min •", "5 h • Modifié",
+ * "3 j"). Validated live (FR feed, 2026): a plain `<span>`, NO `<time>` element. Anchored at `^` and
+ * requiring a unit `\b` so a headline that merely starts with a number ("5 ans d'expérience") can't
+ * match; capture group 1 is the verbatim token (backend derives the date). FR + EN units; the bare
+ * `m` minute/month ambiguity is avoided by only matching `min` / `mo`.
+ */
+export const POSTED_AT_PATTERN =
+  /^(à l['’ ]instant|maintenant|just now|now|\d+\s*(?:secondes?|sec|s|minutes?|min|heures?|hrs?|hr|h|jours?|j|days?|d|semaines?|sem|wk|w|mois|months?|mo|années?|ans?|an|yrs?|yr|y))\b/i;
+
+/**
+ * The author's headline/occupation subtitle in the actor block ("Founder at Globex", "Directrice chez
+ * Renault", "CEO @ Acme"). Best-effort, mutable: split only on a clear `chez`/`at`/`@` delimiter — FR
+ * headlines are noisy free-text taglines — else leave both company/title null. title = group 1 || 3,
+ * company = group 2 || 4. Applied to the FIRST `|`/`·`/`•` segment so trailing tagline noise is dropped.
+ */
+export const HEADLINE_SPLIT_PATTERN = /^(.+?)\s+(?:chez|at)\s+(.+)$|^(.+?)\s*@\s*(.+)$/i;
 
 /**
  * A quote-repost (reshare-with-thoughts) embeds the original post as a nested card that links to the
