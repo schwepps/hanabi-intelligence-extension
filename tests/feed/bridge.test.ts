@@ -200,5 +200,13 @@ describe('isValidCapturedPost', () => {
         }),
       ),
     ).toBe(false);
+    // a forged non-string original_author_name must be rejected even when is_repost is false
+    // (the guard claims `value is PostPayload`; a non-string would 422 the backend batch)
+    expect(
+      isValidCapturedPost({
+        ...stubPayload({ linkedin_post_id: 'urn:li:activity:1', is_repost: false }),
+        original_author_name: {},
+      } as unknown),
+    ).toBe(false);
   });
 });

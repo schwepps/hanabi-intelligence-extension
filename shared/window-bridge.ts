@@ -108,16 +108,17 @@ function isValidComment(value: unknown): boolean {
 }
 
 /**
- * A repost must carry its original author: the backend refine (FSC-98) rejects `is_repost: true` with
- * a null `original_author_name`, and we never attribute a reshare to the resharer. Non-reposts have no
- * such requirement. Mirrors the extension-side invariant `resolveRepost` already upholds (FSC-115).
- * Assumes `is_repost` is already type-checked as a boolean by the caller.
+ * Validate `original_author_name` for BOTH branches. It must always be a nullable string — the guard
+ * claims `value is PostPayload` and the forgeable bridge could send an object, which would slip through
+ * to the wire and 422 the backend batch. When `is_repost` is true the backend refine (FSC-98) also
+ * requires it non-empty (we never attribute a reshare to the resharer). Mirrors the invariant
+ * `resolveRepost` already upholds (FSC-115). Assumes `is_repost` is already type-checked as a boolean.
  */
 function isValidRepostProvenance(post: Record<string, unknown>): boolean {
+  const name = post.original_author_name;
+  if (name !== null && typeof name !== 'string') return false;
   if (post.is_repost !== true) return true;
-  return (
-    typeof post.original_author_name === 'string' && post.original_author_name.trim().length > 0
-  );
+  return typeof name === 'string' && name.trim().length > 0;
 }
 
 /**
