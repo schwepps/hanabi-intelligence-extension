@@ -106,6 +106,43 @@ describe('isValidCapturedPost', () => {
         }),
       ),
     ).toBe(false);
+    // lookalike host is rejected (endsWith bug)
+    expect(
+      isValidCapturedPost(
+        stubPayload({
+          linkedin_post_id: 'urn:li:activity:1',
+          url: 'https://evillinkedin.com/feed/update/x',
+        }),
+      ),
+    ).toBe(false);
+    // numeric sanity: negative / non-integer counts
+    expect(
+      isValidCapturedPost(
+        stubPayload({ linkedin_post_id: 'urn:li:activity:1', reaction_count: -5 }),
+      ),
+    ).toBe(false);
+    expect(
+      isValidCapturedPost(
+        stubPayload({ linkedin_post_id: 'urn:li:activity:1', comment_count: 1.5 }),
+      ),
+    ).toBe(false);
+    // element types: non-string hashtag, comment with off-host profile url
+    expect(
+      isValidCapturedPost({
+        ...stubPayload({ linkedin_post_id: 'urn:li:activity:1' }),
+        hashtags: [1, 2],
+      } as unknown),
+    ).toBe(false);
+    expect(
+      isValidCapturedPost(
+        stubPayload({
+          linkedin_post_id: 'urn:li:activity:1',
+          comments: [
+            { author_name: 'x', author_profile_url: 'https://evil.example.com/in/y', text: 'hi' },
+          ],
+        }),
+      ),
+    ).toBe(false);
     // wrong container types / non-objects
     expect(
       isValidCapturedPost({

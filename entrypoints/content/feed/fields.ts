@@ -1,3 +1,4 @@
+import { isLinkedInHost } from '@/shared/linkedin-url';
 import type { AuthorType, CommentSignal, PostType } from '@/shared/payload';
 import { cleanText, queryAll, queryText } from '../dom';
 import { parseLocalizedCount } from '../parse/number';
@@ -188,7 +189,7 @@ function normalizeProfileUrl(href: string | null | undefined): string | null {
   if (!href) return null;
   try {
     const url = new URL(href, 'https://www.linkedin.com');
-    if (!url.hostname.replace(/^www\./, '').endsWith('linkedin.com')) return null;
+    if (!isLinkedInHost(url.hostname)) return null;
     return `https://www.linkedin.com${url.pathname}`;
   } catch {
     return null;

@@ -21,6 +21,7 @@
  *     (e.g. only the URN, extracting isolated-side) is a possible future hardening, at the cost of
  *     MAIN↔ISOLATED node correlation.
  */
+import { isLinkedInUrl } from '@/shared/linkedin-url';
 import type { PostPayload } from '@/shared/payload';
 
 export const BRIDGE_SOURCE = 'hanabi-feed-bridge';
@@ -87,19 +88,30 @@ export const MAX_CAPTURE_POSTS = 100;
 
 const POST_URN_RE = /^urn:li:(?:activity|ugcPost):\d+$/;
 
-function isLinkedInUrl(value: unknown): boolean {
-  if (typeof value !== 'string') return false;
-  try {
-    return new URL(value).hostname.replace(/^www\./, '').endsWith('linkedin.com');
-  } catch {
-    return false;
-  }
+/** A non-negative integer count. */
+function isCount(value: unknown): boolean {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0;
+}
+
+function isNullableLinkedInUrl(value: unknown): boolean {
+  return value === null || isLinkedInUrl(value);
+}
+
+function isValidComment(value: unknown): boolean {
+  if (typeof value !== 'object' || value === null) return false;
+  const comment = value as Record<string, unknown>;
+  return (
+    (comment.author_name === null || typeof comment.author_name === 'string') &&
+    isNullableLinkedInUrl(comment.author_profile_url) &&
+    (comment.text === null || typeof comment.text === 'string')
+  );
 }
 
 /**
  * Validate an inbound capture payload before it is trusted/forwarded. The bridge is forgeable, so a
  * `capture` message can carry arbitrary objects — accept only well-formed posts: a real post URN as
- * the dedup key, linkedin.com hosts on the urls, and the right container types.
+ * the dedup key, linkedin.com hosts on the urls, sane non-negative counts, and well-typed elements in
+ * the `hashtags` / `comments` arrays.
  */
 export function isValidCapturedPost(value: unknown): value is PostPayload {
   if (typeof value !== 'object' || value === null) return false;
@@ -108,11 +120,13 @@ export function isValidCapturedPost(value: unknown): value is PostPayload {
     typeof post.linkedin_post_id === 'string' &&
     POST_URN_RE.test(post.linkedin_post_id) &&
     isLinkedInUrl(post.url) &&
-    (post.author_profile_url === null || isLinkedInUrl(post.author_profile_url)) &&
-    typeof post.reaction_count === 'number' &&
-    typeof post.comment_count === 'number' &&
+    isNullableLinkedInUrl(post.author_profile_url) &&
+    isCount(post.reaction_count) &&
+    isCount(post.comment_count) &&
     Array.isArray(post.hashtags) &&
-    Array.isArray(post.comments)
+    post.hashtags.every((tag) => typeof tag === 'string') &&
+    Array.isArray(post.comments) &&
+    post.comments.every(isValidComment)
   );
 }
 

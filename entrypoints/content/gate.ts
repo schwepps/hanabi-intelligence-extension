@@ -48,11 +48,13 @@ export function watchFeed(
   const nav = (window as unknown as { navigation?: EventTarget }).navigation;
   nav?.addEventListener('navigate', deferredNotify);
   window.addEventListener('popstate', notify);
-  const timer = setInterval(notify, options.pollMs ?? 1000);
+  // Poll only as a fallback when the Navigation API is unavailable — otherwise the `navigate` event
+  // covers SPA routing and a continuous per-tab interval is wasted background work.
+  const timer = nav ? undefined : setInterval(notify, options.pollMs ?? 1000);
 
   return () => {
     nav?.removeEventListener('navigate', deferredNotify);
     window.removeEventListener('popstate', notify);
-    clearInterval(timer);
+    if (timer !== undefined) clearInterval(timer);
   };
 }
