@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Activez votre capteur Hanabi</title>
+  </head>
+  <body>
+    <main class="hb-page">
+      <section class="hb-card" aria-labelledby="hb-title">
+        <header class="hb-brand">
+          <span class="hb-brand-mark" aria-hidden="true"></span>
+          <span class="hb-brand-word">Hanabi<span class="hb-brand-word-accent"> Radar</span></span>
+        </header>
+
+        <h1 id="hb-title" class="hb-title">Activez votre capteur Hanabi</h1>
+        <p class="hb-intro">
+          L'extension lit <strong>passivement</strong> les publications de votre fil LinkedIn pour
+          aider le collectif Hanabi à repérer des opportunités et des mises en relation. Elle ne lit
+          que ce que vous voyez déjà en faisant défiler votre fil —
+          <strong>aucune automatisation, aucune action en votre nom</strong>.
+        </p>
+
+        <div class="hb-cols">
+          <div class="hb-col">
+            <h2 class="hb-h2">Ce qui est capturé</h2>
+            <ul class="hb-list">
+              <li>la publication : texte, auteur, entreprise et poste ;</li>
+              <li>le type de contenu (texte, image, vidéo, document, sondage…) ;</li>
+              <li>les réactions et les commentaires visibles ;</li>
+              <li>les hashtags ;</li>
+              <li>les signaux de mise en relation (degré de connexion, qui l'a fait remonter).</li>
+            </ul>
+          </div>
+          <div class="hb-col">
+            <h2 class="hb-h2">Ce qui n'est jamais capturé</h2>
+            <ul class="hb-list">
+              <li>vos messages privés ;</li>
+              <li>vos notifications ;</li>
+              <li>votre liste de connexions.</li>
+            </ul>
+            <p class="hb-note">Uniquement les publications affichées dans votre fil.</p>
+          </div>
+        </div>
+
+        <p class="hb-why">
+          <strong>Pourquoi ?</strong> Alimenter le tableau de bord Hanabi réservé aux partenaires
+          (accès protégé). <strong>Vous gardez le contrôle :</strong> la capture démarre seulement
+          après votre accord et se désactive à tout moment depuis l'icône de l'extension (ou en la
+          désinstallant).
+        </p>
+
+        <form id="hb-form-section" class="hb-form" novalidate>
+          <label class="hb-field">
+            <span class="hb-field-label">Votre jeton de capteur Hanabi</span>
+            <input
+              id="hb-token"
+              class="hb-input"
+              type="password"
+              autocomplete="off"
+              spellcheck="false"
+              placeholder="Collez le jeton fourni par Hanabi"
+            />
+          </label>
+          <button id="hb-verify" class="hb-btn hb-btn-secondary" type="button">Vérifier</button>
+          <p id="hb-verify-status" class="hb-status" role="status" aria-live="polite"></p>
+
+          <p id="hb-identity" class="hb-identity" hidden></p>
+
+          <div id="hb-consent-section" class="hb-consent" hidden>
+            <label class="hb-check">
+              <input id="hb-consent-check" type="checkbox" />
+              <span
+                >J'ai compris et j'accepte que l'extension capture les publications de mon fil
+                LinkedIn comme décrit ci-dessus.</span
+              >
+            </label>
+            <button id="hb-activate" class="hb-btn hb-btn-primary" type="submit" disabled>
+              Activer la capture
+            </button>
+            <p id="hb-activate-status" class="hb-status" role="alert" aria-live="assertive"></p>
+          </div>
+        </form>
+
+        <div id="hb-success" class="hb-success" hidden>
+          <h2 class="hb-h2">Capture activée ✓</h2>
+          <p>
+            Vous pouvez fermer cet onglet. Gérez la capture à tout moment depuis l'icône
+            <strong>Hanabi Radar</strong> de votre navigateur.
+          </p>
+        </div>
+      </section>
+    </main>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

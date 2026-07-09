@@ -13,3 +13,24 @@
 export const consentGranted = storage.defineItem<boolean>('local:hanabi:consentGranted', {
   fallback: false,
 });
+
+/**
+ * Local GDPR record of WHEN the sensor consented (epoch ms; `null` = not consented). The
+ * authoritative consent record lives server-side (`sensors.consented_at`, set via the extension's
+ * onboarding). This mirrors it locally so the popup/onboarding can reflect state without a round-trip.
+ */
+export const consentedAt = storage.defineItem<number | null>('local:hanabi:consentedAt', {
+  fallback: null,
+});
+
+/** Turn capture ON and stamp the consent moment. The content gate's `consentGranted.watch()` starts capture live. */
+export async function grantConsent(): Promise<void> {
+  await consentGranted.setValue(true);
+  await consentedAt.setValue(Date.now());
+}
+
+/** Turn capture OFF (opt-out). The content gate stops capture live; the linked identity is kept for easy re-opt-in. */
+export async function revokeConsent(): Promise<void> {
+  await consentGranted.setValue(false);
+  await consentedAt.setValue(null);
+}

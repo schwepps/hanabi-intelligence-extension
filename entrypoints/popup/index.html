@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Hanabi Radar</title>
+  </head>
+  <body>
+    <main class="hb-popup">
+      <header class="hb-brand">
+        <span class="hb-brand-mark" aria-hidden="true"></span>
+        <span class="hb-brand-word">Hanabi<span class="hb-brand-word-accent"> Radar</span></span>
+      </header>
+
+      <div class="hb-state">
+        <span id="hb-dot" class="hb-dot" aria-hidden="true"></span>
+        <div>
+          <p id="hb-status" class="hb-status-label"></p>
+          <p id="hb-detail" class="hb-detail"></p>
+        </div>
+      </div>
+
+      <button id="hb-action" class="hb-btn hb-btn-primary" type="button"></button>
+      <button id="hb-review" class="hb-btn hb-btn-ghost" type="button">
+        Revoir les informations
+      </button>
+    </main>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>
