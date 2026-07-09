@@ -5,21 +5,12 @@ import { sensorIdentity } from '@/shared/identity';
 import { drain, enqueueAndDrain, handleConsentChange } from '@/entrypoints/background/drain';
 import { enqueue, sendQueue } from '@/entrypoints/background/queue';
 import { hasSent } from '@/entrypoints/background/sent-ids';
-import { retryState } from '@/entrypoints/background/backoff';
+import { sendRetry } from '@/entrypoints/background/backoff';
 import { stubPayload } from '../support/factories';
+import { jsonResponse, stubFetchSequence } from '../support/fetch';
 
 const urn = (n: number | string) => `urn:li:activity:${n}`;
-const jsonResponse = (status: number, body: unknown): Response =>
-  new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 const ok200 = () => jsonResponse(200, { received: 1, new_items: 1, known_items: 0 });
-
-/** Sequence of fetch responses; each call shifts the next (last one repeats). */
-const stubFetchSequence = (...responses: Array<() => Response | Promise<Response>>) => {
-  let i = 0;
-  const mock = vi.fn(() => Promise.resolve(responses[Math.min(i++, responses.length - 1)]()));
-  vi.stubGlobal('fetch', mock);
-  return mock;
-};
 
 async function link(): Promise<void> {
   await sensorIdentity.setValue({ token: 'tok', id: 's1', name: 'n', email: 'e', linkedAt: 0 });
@@ -70,7 +61,7 @@ describe('drain', () => {
     expect(await sendQueue.getValue()).toEqual([]);
     expect(await hasSent(urn(1))).toBe(true);
     expect(create).not.toHaveBeenCalled();
-    expect((await retryState.getValue()).failureStreak).toBe(0);
+    expect((await sendRetry.getValue()).failureStreak).toBe(0);
   });
 
   it('keeps the queue and schedules a retry on a transient failure', async () => {
@@ -85,7 +76,7 @@ describe('drain', () => {
 
     expect(await ids()).toEqual([urn(1)]); // not lost
     expect(create).toHaveBeenCalledTimes(1);
-    expect((await retryState.getValue()).failureStreak).toBe(1);
+    expect((await sendRetry.getValue()).failureStreak).toBe(1);
   });
 
   it('recovers across drains: transient then success delivers the post', async () => {
@@ -101,7 +92,7 @@ describe('drain', () => {
 
     expect(await sendQueue.getValue()).toEqual([]);
     expect(await hasSent(urn(1))).toBe(true);
-    expect((await retryState.getValue()).failureStreak).toBe(0);
+    expect((await sendRetry.getValue()).failureStreak).toBe(0);
   });
 
   it('halts on 401 without losing data or marking it sent', async () => {
@@ -147,22 +138,34 @@ describe('drain', () => {
     expect(warn).toHaveBeenCalled();
   });
 
-  it('coalesces concurrent drains — a single in-flight send (re-entrancy guard)', async () => {
+  it('coalesces concurrent drains and still sends a post enqueued mid-flight (re-entrancy guard)', async () => {
     let release!: (r: Response) => void;
     const gate = new Promise<Response>((r) => (release = r));
-    const fetchMock = vi.fn(() => gate);
+    let markFirstCall!: () => void;
+    const firstInFlight = new Promise<void>((r) => (markFirstCall = r));
+    let isFirst = true;
+    const fetchMock = vi.fn(() => {
+      if (isFirst) {
+        isFirst = false;
+        markFirstCall();
+        return gate; // hold the first send open
+      }
+      return Promise.resolve(ok200());
+    });
     vi.stubGlobal('fetch', fetchMock);
     await link();
     await enqueue(stubPayload({ linkedin_post_id: urn(1) }));
 
-    const first = drain();
-    const second = drain(); // should not start a parallel send
+    const running = drain();
+    await firstInFlight; // the first POST is genuinely open
+    await enqueueAndDrain(stubPayload({ linkedin_post_id: urn(2) })); // arrives mid-flight → coalesced
     release(ok200());
-    await Promise.all([first, second]);
+    await running;
     await new Promise((r) => setTimeout(r, 0)); // let the coalesced rerun settle
 
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(await sendQueue.getValue()).toEqual([]);
+    expect(await hasSent(urn(1))).toBe(true);
+    expect(await hasSent(urn(2))).toBe(true); // the mid-flight post is delivered, not lost
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it('does not commit or retry a batch when consent is revoked while the POST is in flight', async () => {
@@ -216,5 +219,61 @@ describe('drain', () => {
     await handleConsentChange(false);
     expect(await sendQueue.getValue()).toEqual([]);
     expect(clear).toHaveBeenCalled(); // no pending retry should survive opt-out
+  });
+
+  it('splits a backlog larger than the batch cap into sequential sends', async () => {
+    const fetchMock = stubFetchSequence(ok200);
+    await link();
+    for (let i = 0; i < 51; i++) await enqueue(stubPayload({ linkedin_post_id: urn(i) }));
+
+    await drain();
+
+    expect(fetchMock).toHaveBeenCalledTimes(2); // 50 + 1
+    expect(await sendQueue.getValue()).toEqual([]);
+    expect(await hasSent(urn(0))).toBe(true);
+    expect(await hasSent(urn(50))).toBe(true);
+  });
+
+  it('retries with a halved ceiling after a 413, then delivers the batch', async () => {
+    const fetchMock = stubFetchSequence(
+      () => jsonResponse(413, { error: { code: 'payload_too_large' } }),
+      ok200,
+    );
+    await link();
+    await enqueue(stubPayload({ linkedin_post_id: urn(1) }));
+    await enqueue(stubPayload({ linkedin_post_id: urn(2) }));
+
+    await drain();
+
+    expect(fetchMock).toHaveBeenCalledTimes(2); // 413 (tooLarge) → retry → 200
+    expect(await sendQueue.getValue()).toEqual([]);
+    expect(await hasSent(urn(1))).toBe(true);
+    expect(await hasSent(urn(2))).toBe(true);
+  });
+
+  it('drops a lone post that keeps drawing 413 (cannot be sent), then terminates', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    stubFetchSequence(() => jsonResponse(413, { error: { code: 'payload_too_large' } }));
+    await link();
+    await enqueue(stubPayload({ linkedin_post_id: urn(1) }));
+
+    await drain(); // must terminate (loop halves maxPosts to 1, then drops)
+
+    expect(await sendQueue.getValue()).toEqual([]);
+    expect(await hasSent(urn(1))).toBe(false); // dropped, never marked sent
+  });
+
+  it('backs off (schedules a retry) when a local storage read throws mid-drain', async () => {
+    const create = vi.spyOn(browser.alarms, 'create');
+    stubFetchSequence(ok200);
+    await link();
+    await enqueue(stubPayload({ linkedin_post_id: urn(1) }));
+    // Simulate a storage failure (e.g. QuotaExceededError) on the next queue read.
+    vi.spyOn(sendQueue, 'getValue').mockRejectedValueOnce(new Error('quota exceeded'));
+
+    await drain();
+
+    expect(create).toHaveBeenCalledTimes(1); // retry scheduled instead of an unhandled rejection
+    expect((await sendRetry.getValue()).failureStreak).toBe(1);
   });
 });

@@ -11,10 +11,10 @@ describe('retry scheduler (browser.alarms seam)', () => {
   beforeEach(() => fakeBrowser.reset());
   afterEach(() => vi.restoreAllMocks());
 
-  it('scheduleRetry creates a single named alarm (same name replaces, never stacks)', () => {
+  it('scheduleRetry creates a single named alarm (same name replaces, never stacks)', async () => {
     const create = vi.spyOn(browser.alarms, 'create');
 
-    scheduleRetry(2);
+    await scheduleRetry(2);
 
     expect(create).toHaveBeenCalledWith(RETRY_ALARM_NAME, { delayInMinutes: 2 });
   });

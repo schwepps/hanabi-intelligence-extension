@@ -4,7 +4,7 @@ import {
   computeDelayMinutes,
   nextStreak,
   resetStreak,
-  retryState,
+  sendRetry,
 } from '@/entrypoints/background/backoff';
 
 // rng() === 1 removes jitter (factor 1.0) so the doubling is exact and easy to assert.
@@ -33,22 +33,22 @@ describe('computeDelayMinutes', () => {
   });
 });
 
-describe('retryState (persisted failure streak)', () => {
+describe('sendRetry (persisted failure streak)', () => {
   beforeEach(() => fakeBrowser.reset());
 
   it('defaults to a zero streak', async () => {
-    expect(await retryState.getValue()).toEqual({ failureStreak: 0 });
+    expect(await sendRetry.getValue()).toEqual({ failureStreak: 0 });
   });
 
   it('nextStreak increments and persists, returning the new streak', async () => {
     expect(await nextStreak()).toBe(1);
     expect(await nextStreak()).toBe(2);
-    expect((await retryState.getValue()).failureStreak).toBe(2);
+    expect((await sendRetry.getValue()).failureStreak).toBe(2);
   });
 
   it('resetStreak clears the streak back to zero', async () => {
     await nextStreak();
     await resetStreak();
-    expect((await retryState.getValue()).failureStreak).toBe(0);
+    expect((await sendRetry.getValue()).failureStreak).toBe(0);
   });
 });

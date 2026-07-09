@@ -13,6 +13,7 @@ export default defineBackground(() => {
   // Send-queue wiring (FSC-112). This entrypoint is pure wiring: every listener registers
   // synchronously so a waking worker catches its trigger, and all behavior lives in ./drain and its
   // collaborators (queue, send, backoff, scheduler — each unit-tested).
+  browser.runtime.onStartup.addListener(() => void drain()); // browser restart: resume any backlog
   onPostCaptured((payload) => void enqueueAndDrain(payload)); // capture → durable queue → send
   onRetryAlarm(() => void drain()); // scheduled backoff retry after a failure
   sensorIdentity.watch(() => void drain()); // resume the drain right after a re-link (401 recovery)

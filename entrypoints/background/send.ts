@@ -22,12 +22,13 @@ export type SubmitOutcome =
   | { kind: 'ok'; failed: string[] } // 200 — forget the whole batch; `failed` were isolated backend-side
   | { kind: 'poison'; dropIds: string[] } // 422 — drop the schema-rejected posts, retry the rest
   | { kind: 'tooLarge' } // 413 — caller must re-chunk into a smaller batch
-  | { kind: 'halt' } // 401/403/415/400/… — stop the drain, keep the data (request/auth problem)
-  | { kind: 'transient' }; // 429 / 5xx / network — retryable with backoff
+  | { kind: 'halt' } // 401/403/404/415/400/… — stop the drain, keep the data (auth/request problem)
+  | { kind: 'transient' }; // 408 / 429 / 5xx / network — retryable with backoff
 
 /**
- * Submit a batch of posts. Never throws; a network failure OR an aborted request maps to `transient`.
- * `signal` lets the caller abort an in-flight send (used to stop transmission on consent opt-out).
+ * Submit a batch of posts. Never throws — a network failure, an aborted request, or an unexpected
+ * response shape all map to an outcome. `signal` lets the caller abort an in-flight send (used to stop
+ * transmission on consent opt-out).
  */
 export async function submitBatch(
   posts: PostPayload[],
@@ -43,20 +44,24 @@ export async function submitBatch(
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(buildBatch(posts)),
       signal,
+      // Never re-POST the batch body (post text + author PII) to a redirect target; a 3xx from the
+      // origin becomes a network error → transient retry against the exact configured origin only.
+      redirect: 'error',
     });
   } catch {
     return { kind: 'transient' };
   }
 
   if (res.ok) {
-    // A 200 means the batch was accepted; guard the parse so a proxy/CDN interstitial served as 200
-    // (non-JSON body) doesn't throw out of this "never throws" function — treat it as "no failures".
+    // A 200 means the batch was accepted; guard both the parse and the shape so a proxy/CDN
+    // interstitial served as 200, or a `failed` that isn't an array, can't throw out of this function.
     const body = (await res.json().catch(() => null)) as IngestSuccessBody | null;
-    return { kind: 'ok', failed: (body?.failed ?? []).map((f) => f.linkedin_post_id) };
+    const failed = Array.isArray(body?.failed) ? body.failed : [];
+    return { kind: 'ok', failed: failed.map((f) => f.linkedin_post_id) };
   }
   if (res.status === 413) return { kind: 'tooLarge' };
   if (res.status === 422) return classifyPoison(res, posts);
-  if (res.status === 429 || res.status >= 500) return { kind: 'transient' };
+  if (res.status === 408 || res.status === 429 || res.status >= 500) return { kind: 'transient' };
   // Everything else non-2xx (401/403/404/415/400/…) is an auth/request/deploy problem: retrying the
   // same request won't help, so halt and keep the data rather than spin or drop it.
   return { kind: 'halt' };
@@ -70,8 +75,9 @@ export async function submitBatch(
  */
 async function classifyPoison(res: Response, posts: PostPayload[]): Promise<SubmitOutcome> {
   const body = (await res.json().catch(() => null)) as IngestErrorBody | null;
+  const issues = Array.isArray(body?.error?.issues) ? body.error.issues : [];
   const dropIds = new Set<string>();
-  for (const issue of body?.error?.issues ?? []) {
+  for (const issue of issues) {
     const index = issue.path?.[1];
     if (typeof index === 'number' && posts[index]) dropIds.add(posts[index].linkedin_post_id);
   }

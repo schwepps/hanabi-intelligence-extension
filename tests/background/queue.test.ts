@@ -29,6 +29,17 @@ describe('send queue', () => {
     expect(typeof queue[0].enqueuedAt).toBe('number');
   });
 
+  it('strips comments before persisting (never stores commenter PII we never send)', async () => {
+    await enqueue(
+      stubPayload({
+        linkedin_post_id: urn(1),
+        comments: [{ author_name: 'Bob', author_profile_url: 'https://x', text: 'nice' }],
+      }),
+    );
+
+    expect((await sendQueue.getValue())[0].payload.comments).toEqual([]);
+  });
+
   it('skips a post already confirmed sent', async () => {
     await markSent([urn(1)]);
 

@@ -2,17 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { submitBatch } from '@/entrypoints/background/send';
 import type { IngestBatch } from '@/shared/ingestion';
 import { stubPayload } from '../support/factories';
-
-const jsonResponse = (status: number, body: unknown): Response =>
-  new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
-
-const stubFetch = (
-  impl: (input: string | URL | Request, init?: RequestInit) => Promise<Response>,
-) => {
-  const mock = vi.fn(impl);
-  vi.stubGlobal('fetch', mock);
-  return mock;
-};
+import { jsonResponse, stubFetch } from '../support/fetch';
 
 const urn = (n: number | string) => `urn:li:activity:${n}`;
 const ok = (extra: Record<string, unknown> = {}) =>
@@ -121,16 +111,13 @@ describe('submitBatch', () => {
     expect(outcome).toEqual({ kind: 'halt' });
   });
 
-  it('treats 429 and 5xx as transient (retry with backoff)', async () => {
-    stubFetch(() => Promise.resolve(jsonResponse(429, errorBody('rate_limited'))));
-    await expect(submitBatch([stubPayload({ linkedin_post_id: urn(1) })], 'tok')).resolves.toEqual({
-      kind: 'transient',
-    });
-
-    stubFetch(() => Promise.resolve(jsonResponse(500, errorBody('ingest_failed'))));
-    await expect(submitBatch([stubPayload({ linkedin_post_id: urn(1) })], 'tok')).resolves.toEqual({
-      kind: 'transient',
-    });
+  it('treats 408, 429 and 5xx as transient (retry with backoff)', async () => {
+    for (const status of [408, 429, 500, 503]) {
+      stubFetch(() => Promise.resolve(jsonResponse(status, errorBody('err'))));
+      await expect(
+        submitBatch([stubPayload({ linkedin_post_id: urn(1) })], 'tok'),
+      ).resolves.toEqual({ kind: 'transient' });
+    }
   });
 
   it('treats a network error as transient, never throwing into the drain', async () => {
@@ -155,13 +142,29 @@ describe('submitBatch', () => {
     });
   });
 
-  it('forwards an abort signal to fetch', async () => {
+  it('forwards an abort signal to fetch and refuses redirects', async () => {
     const fetchMock = stubFetch(() => Promise.resolve(ok()));
     const controller = new AbortController();
 
     await submitBatch([stubPayload({ linkedin_post_id: urn(1) })], 'tok', controller.signal);
 
     expect(fetchMock.mock.calls[0][1]?.signal).toBe(controller.signal);
+    expect(fetchMock.mock.calls[0][1]?.redirect).toBe('error');
+  });
+
+  it('never throws on a malformed response shape (non-array failed / issues)', async () => {
+    stubFetch(() => Promise.resolve(ok({ failed: { not: 'an array' } })));
+    await expect(submitBatch([stubPayload({ linkedin_post_id: urn(1) })], 'tok')).resolves.toEqual({
+      kind: 'ok',
+      failed: [],
+    });
+
+    stubFetch(() =>
+      Promise.resolve(jsonResponse(422, { error: { code: 'invalid_payload', issues: 7 } })),
+    );
+    await expect(submitBatch([stubPayload({ linkedin_post_id: urn(1) })], 'tok')).resolves.toEqual({
+      kind: 'halt',
+    });
   });
 
   it('never sends an empty batch (backend rejects it)', async () => {

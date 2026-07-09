@@ -7,17 +7,17 @@
  */
 import { consentGranted } from '@/shared/consent';
 import { sensorIdentity } from '@/shared/identity';
-import { BATCH_MAX_POSTS, MAX_BATCH_BYTES, toIngestPost } from '@/shared/ingestion';
+import { BATCH_MAX_POSTS, buildBatch, MAX_BATCH_BYTES, toIngestPost } from '@/shared/ingestion';
 import { logDebug, logWarn } from '@/shared/log';
 import type { PostPayload } from '@/shared/payload';
 import { computeDelayMinutes, nextStreak, resetStreak } from './backoff';
 import { clearQueue, commitSent, dropIds, enqueue, type QueueEntry, sendQueue } from './queue';
 import { clearRetry, scheduleRetry } from './scheduler';
-import { submitBatch } from './send';
+import { submitBatch, type SubmitOutcome } from './send';
 
 // Single worker instance ⇒ two in-memory flags are enough to serialize the drain triggers.
-let draining = false;
-let rerunRequested = false;
+let isDraining = false;
+let isRerunRequested = false;
 // The AbortController for the batch currently on the wire, so opt-out can cancel it mid-flight.
 let inFlight: AbortController | null = null;
 
@@ -41,17 +41,27 @@ export async function handleConsentChange(granted: boolean): Promise<void> {
 
 /** Drain the queue to the backend. Re-entrant calls coalesce into one run + at most one rerun. */
 export async function drain(): Promise<void> {
-  if (draining) {
-    rerunRequested = true;
+  if (isDraining) {
+    isRerunRequested = true;
     return;
   }
-  draining = true;
+  isDraining = true;
   try {
     await runDrain();
+  } catch (error) {
+    // A LOCAL failure (e.g. storage QuotaExceededError) must back off like a network failure, not
+    // escape as an unhandled rejection that strands the queue with no scheduled retry. Guard the
+    // recovery itself too, so nothing (not even a failing alarms API) can escape drain().
+    logWarn('drain failed unexpectedly — scheduling retry', error);
+    try {
+      await scheduleRetry(computeDelayMinutes(await nextStreak().catch(() => 1)));
+    } catch (scheduleError) {
+      logWarn('failed to schedule retry after drain error', scheduleError);
+    }
   } finally {
-    draining = false;
-    if (rerunRequested) {
-      rerunRequested = false;
+    isDraining = false;
+    if (isRerunRequested) {
+      isRerunRequested = false;
       void drain();
     }
   }
@@ -63,7 +73,6 @@ async function runDrain(): Promise<void> {
   for (;;) {
     const token = (await sensorIdentity.getValue())?.token;
     if (!token) return; // not linked — nothing to authenticate with; resume on identity change
-
     if (!(await consentGranted.getValue())) return; // opt-out gate (the watcher also clears the queue)
 
     const queue = await sendQueue.getValue();
@@ -82,39 +91,56 @@ async function runDrain(): Promise<void> {
     );
     inFlight = null;
 
-    // Re-check consent AFTER the network round-trip: if the sensor opted out while this batch was in
-    // flight, don't act on the result — don't mark it sent, don't schedule a retry. The queue was
-    // already cleared by the opt-out watcher; transmit nothing further.
+    // Re-check consent AFTER the round-trip: if the sensor opted out while this batch was in flight,
+    // don't act on the result — don't mark it sent, don't schedule a retry. The queue was already
+    // cleared by the opt-out watcher; transmit nothing further.
     if (!(await consentGranted.getValue())) return;
 
-    if (outcome.kind === 'ok') {
+    const step = await applyOutcome(outcome, batch, maxPosts);
+    if (step.done) return;
+    maxPosts = step.maxPosts;
+  }
+}
+
+/** Apply one submit outcome to the queue; returns whether the drain loop should stop and the next
+ * batch ceiling. Kept small and pure-ish so the state transitions are easy to read and test. */
+async function applyOutcome(
+  outcome: SubmitOutcome,
+  batch: QueueEntry[],
+  maxPosts: number,
+): Promise<{ done: boolean; maxPosts: number }> {
+  switch (outcome.kind) {
+    case 'ok':
       await commitSent(batch.map((entry) => entry.id));
       for (const failed of outcome.failed) logWarn('ingest isolated a post — dropped', failed);
       await resetStreak();
-      maxPosts = BATCH_MAX_POSTS;
-      continue;
-    }
-    if (outcome.kind === 'poison') {
+      return { done: false, maxPosts: BATCH_MAX_POSTS };
+    case 'poison':
       await dropIds(outcome.dropIds);
       for (const id of outcome.dropIds) logWarn('ingest rejected a post (schema) — dropped', id);
-      continue;
-    }
-    if (outcome.kind === 'tooLarge') {
-      maxPosts = await shrinkOrDrop(batch, maxPosts);
-      continue;
-    }
-    if (outcome.kind === 'transient') {
+      return { done: false, maxPosts };
+    case 'tooLarge':
+      return { done: false, maxPosts: await shrinkOrDrop(batch, maxPosts) };
+    case 'transient': {
       const streak = await nextStreak();
-      scheduleRetry(computeDelayMinutes(streak));
+      await scheduleRetry(computeDelayMinutes(streak));
       logDebug('ingest transient failure — retry scheduled', streak);
-      return;
+      return { done: true, maxPosts };
     }
-    // halt (auth / malformed request): keep the data, cancel any timed retry (won't help until the
-    // identity or the request changes); resume on `sensorIdentity.watch` / the next enqueue.
-    clearRetry();
-    logWarn('ingest halted (auth/request) — awaiting re-link');
-    return;
+    case 'halt':
+      // Auth / malformed request: keep the data, cancel any timed retry (won't help until the
+      // identity or the request changes); resume on `sensorIdentity.watch` / the next enqueue.
+      clearRetry();
+      logWarn('ingest halted (auth/request) — awaiting re-link');
+      return { done: true, maxPosts };
+    default:
+      return assertNever(outcome);
   }
+}
+
+/** Exhaustiveness guard: a new `SubmitOutcome` variant becomes a compile error here, not a silent halt. */
+function assertNever(value: never): never {
+  throw new Error(`unhandled submit outcome: ${JSON.stringify(value)}`);
 }
 
 /** On a 413, halve the batch; if a lone post still overflows the body cap, drop it (can't be sent). */
@@ -129,7 +155,8 @@ async function shrinkOrDrop(batch: QueueEntry[], maxPosts: number): Promise<numb
 }
 
 const encoder = new TextEncoder();
-const ENVELOPE_BYTES = encoder.encode('{"version":1,"posts":[]}').length;
+// Byte size of the empty envelope, derived from the SSOT wire builder so it can't drift from buildBatch.
+const ENVELOPE_BYTES = encoder.encode(JSON.stringify(buildBatch([]))).length;
 
 /** Take up to `maxPosts` head entries that also fit the backend body-size cap. Always ≥ 1. */
 function selectBatch(queue: QueueEntry[], maxPosts: number): QueueEntry[] {
@@ -137,7 +164,7 @@ function selectBatch(queue: QueueEntry[], maxPosts: number): QueueEntry[] {
   let bytes = ENVELOPE_BYTES;
   for (const entry of queue) {
     if (batch.length >= maxPosts) break;
-    const size = encoder.encode(JSON.stringify(toIngestPost(entry.payload))).length + 1;
+    const size = encoder.encode(JSON.stringify(toIngestPost(entry.payload))).length + 1; // +1 = comma
     if (batch.length > 0 && bytes + size > MAX_BATCH_BYTES) break;
     batch.push(entry);
     bytes += size;

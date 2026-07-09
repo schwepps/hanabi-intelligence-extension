@@ -8,9 +8,13 @@
 /** Single alarm name for the send-queue retry — same-name `create` replaces, so retries never stack. */
 export const RETRY_ALARM_NAME = 'hanabi:sendRetry';
 
-/** Schedule (or reschedule) the retry drain `delayInMinutes` from now. */
-export function scheduleRetry(delayInMinutes: number): void {
-  void browser.alarms.create(RETRY_ALARM_NAME, { delayInMinutes });
+/**
+ * Schedule (or reschedule) the retry drain `delayInMinutes` from now. Awaitable so the drain can
+ * ensure the alarm exists before it returns — otherwise a worker teardown in the gap could strand a
+ * non-empty queue with no scheduled wake.
+ */
+export async function scheduleRetry(delayInMinutes: number): Promise<void> {
+  await browser.alarms.create(RETRY_ALARM_NAME, { delayInMinutes });
 }
 
 /** Cancel any pending retry alarm (queue drained clean). */

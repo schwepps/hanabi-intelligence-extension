@@ -1,17 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fetchSensorProfile, recordSensorConsent } from '@/shared/sensor-api';
-
-const jsonResponse = (status: number, body: unknown): Response =>
-  new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
-
-/** A typed fetch stub so `mock.calls` is a `[input, init?]` tuple, not an empty tuple. */
-const stubFetch = (
-  impl: (input: string | URL | Request, init?: RequestInit) => Promise<Response>,
-) => {
-  const mock = vi.fn(impl);
-  vi.stubGlobal('fetch', mock);
-  return mock;
-};
+import { jsonResponse, stubFetch } from '../support/fetch';
 
 describe('sensor-api client', () => {
   beforeEach(() => vi.restoreAllMocks());

@@ -6,7 +6,7 @@
  */
 
 /** Persisted count of consecutive failed drain cycles. Reset to 0 on any success. */
-export const retryState = storage.defineItem<{ failureStreak: number }>('local:hanabi:sendRetry', {
+export const sendRetry = storage.defineItem<{ failureStreak: number }>('local:hanabi:sendRetry', {
   fallback: { failureStreak: 0 },
 });
 
@@ -30,12 +30,12 @@ export function computeDelayMinutes(streak: number, rng: () => number = Math.ran
 
 /** Increment the failure streak, persist it, and return the new value. */
 export async function nextStreak(): Promise<number> {
-  const streak = (await retryState.getValue()).failureStreak + 1;
-  await retryState.setValue({ failureStreak: streak });
+  const streak = (await sendRetry.getValue()).failureStreak + 1;
+  await sendRetry.setValue({ failureStreak: streak });
   return streak;
 }
 
 /** Reset the failure streak after a successful drain. */
 export async function resetStreak(): Promise<void> {
-  await retryState.setValue({ failureStreak: 0 });
+  await sendRetry.setValue({ failureStreak: 0 });
 }
