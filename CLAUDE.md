@@ -106,13 +106,19 @@ the backend schema exactly.
   also drops them at rest — data minimization). End-to-end support is tracked in **FSC-114**; FSC-111
   consent copy already covers commenter data.
 - **Field confidence on the 2026 SDUI feed** (validated live): production-grade = `linkedin_post_id`
-  (+ derived `url`), author name/profile_url/type, `text`, `reaction_count`, `hashtags`,
-  `social_proof`, `comments`, `post_type=video`, and repost provenance (`is_repost` +
-  `original_author_*`, FSC-115). Best-effort/deferred (default until a durable anchor lands) =
-  `comment_count`, `author_degree`, `posted_at_raw`, `author_company`/`title`, `media_title`, and
-  non-video `post_type`. `social_proof` comes from the context header ("X a aimé/commenté ceci") and
-  the author is taken from the actor block excluding that header, so a surfaced post attributes to the
-  poster, not the surfacing connection.
+  (+ derived `url`), author name/profile_url/type, `author_degree` (name badge, FSC-116), `text`,
+  `reaction_count`, `hashtags`, `social_proof`, `comments`, `posted_at_raw` (FSC-118),
+  `post_type` ∈ {video, document, article} + `media_title` (document badge, FSC-117), and repost
+  provenance (`is_repost` + `original_author_*`, FSC-115). Best-effort = `author_company`/`title`
+  (headline `chez`/`at`/`@` split, FSC-118 — FR headlines are noisy taglines, so null unless a clear
+  delimiter). Deferred (safe default until a durable anchor lands) = `comment_count`, and `post_type`
+  image/multi_image/poll — no reliable SDUI anchor (content `<img>`s report width 0 / are background
+  images; `role="radio"` is not poll-specific), and kept conservative `text` because `post_type` is
+  **immutable at ingest** (first-capture-wins) so a mistype is permanent. `author_degree` reads only
+  the rendered badge ("• 2e" inside the name link, stripped off `author_name`) — never the connection
+  list (guardrail). `social_proof` comes from the context header ("X a aimé/commenté ceci") and the
+  author is taken from the actor block excluding that header, so a surfaced post attributes to the
+  poster, not the surfacing connection — and `author_degree` is the poster's own, independent of it.
 - **Repost provenance** (`resolveRepost` in `feed/fields.ts`, FSC-115): the original author is captured
   for both reshare shapes, never the resharer — a plain reshare ("X a republié ceci") renders the
   original below the header so `author` (header excluded) already IS the original; a quote-repost
