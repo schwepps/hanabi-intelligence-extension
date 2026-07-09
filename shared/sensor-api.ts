@@ -41,9 +41,12 @@ export async function fetchSensorProfile(token: string): Promise<SensorProfile |
  * locally if the server did not record it.
  */
 export async function recordSensorConsent(token: string): Promise<string> {
+  // No request body — the sensor is identified by the bearer token alone (FSC-98). Deliberately omit
+  // `Content-Type: application/json`: declaring a JSON body without sending one can trip middleware
+  // that tries to parse it.
   const res = await fetch(`${BASE_URL}/api/sensor/consent`, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) throw new Error(`POST /api/sensor/consent failed: ${res.status}`);
   return ((await res.json()) as { consented_at: string }).consented_at;

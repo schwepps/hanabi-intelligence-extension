@@ -15,9 +15,10 @@ export const consentGranted = storage.defineItem<boolean>('local:hanabi:consentG
 });
 
 /**
- * Local GDPR record of WHEN the sensor consented (epoch ms; `null` = not consented). The
- * authoritative consent record lives server-side (`sensors.consented_at`, set via the extension's
- * onboarding). This mirrors it locally so the popup/onboarding can reflect state without a round-trip.
+ * Local timestamp (epoch ms, local clock) of when the sensor last granted consent IN THE EXTENSION;
+ * `null` = not currently consented. This is a local, at-a-glance record — NOT the authoritative GDPR
+ * record, which is the server-set `sensors.consented_at` (via POST /api/sensor/consent) and may differ
+ * in both value and format (ISO string).
  */
 export const consentedAt = storage.defineItem<number | null>('local:hanabi:consentedAt', {
   fallback: null,
