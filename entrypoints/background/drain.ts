@@ -164,7 +164,8 @@ function selectBatch(queue: QueueEntry[], maxPosts: number): QueueEntry[] {
   let bytes = ENVELOPE_BYTES;
   for (const entry of queue) {
     if (batch.length >= maxPosts) break;
-    const size = encoder.encode(JSON.stringify(toIngestPost(entry.payload))).length + 1; // +1 = comma
+    const comma = batch.length > 0 ? 1 : 0; // no separating comma before the first array element
+    const size = encoder.encode(JSON.stringify(toIngestPost(entry.payload))).length + comma;
     if (batch.length > 0 && bytes + size > MAX_BATCH_BYTES) break;
     batch.push(entry);
     bytes += size;

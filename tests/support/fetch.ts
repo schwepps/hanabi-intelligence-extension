@@ -15,6 +15,7 @@ export const stubFetch = (
 
 /** Stub `fetch` with a sequence of response factories; each call shifts the next (last one repeats). */
 export const stubFetchSequence = (...responses: Array<() => Response | Promise<Response>>) => {
+  if (responses.length === 0) throw new Error('stubFetchSequence requires at least one response');
   let i = 0;
   const mock = vi.fn(() => Promise.resolve(responses[Math.min(i++, responses.length - 1)]()));
   vi.stubGlobal('fetch', mock);

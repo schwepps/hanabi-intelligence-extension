@@ -9,9 +9,10 @@
 export const RETRY_ALARM_NAME = 'hanabi:sendRetry';
 
 /**
- * Schedule (or reschedule) the retry drain `delayInMinutes` from now. Awaitable so the drain can
- * ensure the alarm exists before it returns — otherwise a worker teardown in the gap could strand a
- * non-empty queue with no scheduled wake.
+ * Schedule (or reschedule) the retry drain `delayInMinutes` from now. Awaited so `alarms.create`'s
+ * promise — which resolves once the browser has registered the alarm — settles before the drain
+ * returns, rather than returning first and leaving the registration in flight. Not a durability
+ * guarantee (the alarm itself is what's durable), just tighter ordering around the drain's exit.
  */
 export async function scheduleRetry(delayInMinutes: number): Promise<void> {
   await browser.alarms.create(RETRY_ALARM_NAME, { delayInMinutes });
