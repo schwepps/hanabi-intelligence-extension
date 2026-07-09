@@ -1,10 +1,9 @@
 /**
  * Parse a LinkedIn engagement count into a number.
  *
- * LinkedIn renders counts in many locale/abbreviation forms; callers should prefer the exact
- * integer from an `aria-label` ("1,234 reactions") and fall back to the abbreviated visible text
- * ("1.2K"). Returns `null` when no digits are present (absence ≠ zero — the caller decides the
- * 0-vs-null policy per field).
+ * LinkedIn renders counts as localized VISIBLE TEXT ("1 234 réactions", "1.2K"); the caller
+ * (extractCounts) passes those strings here. Returns `null` when no digits are present (absence ≠
+ * zero — the caller decides the 0-vs-null policy per field).
  *
  * Strategy: take the FIRST numeric run (digits + grouping separators — `,` `.` any whitespace incl.
  * NBSP, apostrophe). If a multiplier letter (k/m/b + locale variants) immediately follows, treat

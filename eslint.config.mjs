@@ -11,4 +11,31 @@ export default tseslint.config(
   ...tseslint.configs.recommended,
   autoImports,
   prettier,
+  // World boundary (enforced): the MAIN-world reader and the pure modules it pulls in must NOT use
+  // the extension-API globals `browser` / `storage` — they are undefined in the MAIN world and would
+  // throw at runtime with no type/CI signal. Keep persistence/messaging in the isolated content script.
+  {
+    files: [
+      'entrypoints/feed-reader.content.ts',
+      'entrypoints/content/feed/**/*.ts',
+      'entrypoints/content/dom.ts',
+      'entrypoints/content/observer.ts',
+      'entrypoints/content/parse/**/*.ts',
+    ],
+    rules: {
+      'no-restricted-globals': [
+        'error',
+        {
+          name: 'browser',
+          message:
+            'Extension APIs are unavailable in the MAIN world — keep browser/storage in the isolated content script.',
+        },
+        {
+          name: 'storage',
+          message:
+            'Extension APIs are unavailable in the MAIN world — keep browser/storage in the isolated content script.',
+        },
+      ],
+    },
+  },
 );

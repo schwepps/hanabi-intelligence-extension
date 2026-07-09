@@ -41,6 +41,13 @@ describe('extractAuthor', () => {
     });
   });
 
+  it('classifies a school Page author as an organization (company)', () => {
+    const post = fragment(
+      `<div>${authorBlock('https://www.linkedin.com/school/mit/', 'MIT')}</div>`,
+    );
+    expect(extractAuthor(post)).toMatchObject({ name: 'MIT', type: 'company' });
+  });
+
   it('falls back to the avatar aria-label when no link has text', () => {
     const post = fragment(
       '<div><a href="https://www.linkedin.com/in/x/" aria-label="Ada Lovelace"><img alt="" /></a></div>',

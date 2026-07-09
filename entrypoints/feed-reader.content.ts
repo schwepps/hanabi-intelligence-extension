@@ -3,7 +3,7 @@ import { postCapture, postHello, readBridgeMessage } from '@/shared/window-bridg
 import { assemblePost, type AssembleContext } from './content/feed/assemble';
 import { findFeedRoot, findPostNodes } from './content/feed/nodes';
 import { extractActivityUrn } from './content/feed/react-urn';
-import { debounce, FEED_OBSERVER_DEBOUNCE_MS } from './content/observer';
+import { createFeedObserver, type FeedObserver } from './content/observer';
 
 /**
  * MAIN-world feed reader. Runs in the page context so it can read each post's activity URN from
@@ -17,30 +17,32 @@ export default defineContentScript({
   runAt: 'document_idle',
   main() {
     const context: AssembleContext = { now: () => new Date().toISOString() };
-    let observer: MutationObserver | null = null;
+    // Skip already-extracted element instances so persistent posts aren't re-walked (React-props
+    // traversal) on every settle; the isolated side is still the durable dedup by URN.
+    const seenNodes = new WeakSet<Element>();
+    let observer: FeedObserver | null = null;
 
     const scan = (): void => {
       const feedRoot = findFeedRoot(document);
       if (!feedRoot) return;
       const posts: PostPayload[] = [];
       for (const node of findPostNodes(feedRoot)) {
+        if (seenNodes.has(node)) continue;
+        seenNodes.add(node);
         const payload = assemblePost(node, extractActivityUrn(node), context);
         if (payload) posts.push(payload);
       }
       if (posts.length > 0) postCapture(posts);
     };
-    const scheduleScan = debounce(scan, FEED_OBSERVER_DEBOUNCE_MS);
 
     const start = (): void => {
       if (observer) return;
-      observer = new MutationObserver(() => scheduleScan());
-      observer.observe(document.body, { childList: true, subtree: true });
       scan(); // sweep posts already rendered
+      observer = createFeedObserver(document.body, scan);
     };
     const stop = (): void => {
       observer?.disconnect();
       observer = null;
-      scheduleScan.cancel();
     };
 
     window.addEventListener('message', (event) => {

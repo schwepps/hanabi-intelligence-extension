@@ -6,7 +6,9 @@ import {
   COMMENT_COUNT_PATTERN,
   COMMENT_LIST_SELECTOR,
   ENGAGEMENT_SURFACE_PATTERN,
+  EXPANDABLE_TEXT_SELECTOR,
   HASHTAG_SELECTORS,
+  PERSON_LINK_SELECTOR,
   POST_TEXT_SELECTORS,
   REACTION_COUNT_PATTERN,
   REPOST_SURFACE_PATTERN,
@@ -41,7 +43,9 @@ export function extractAuthor(post: Element, excludeHeader?: Element | null): Au
   const link = nameLink ?? links[0] ?? null;
 
   const profile_url = normalizeProfileUrl(link?.getAttribute('href'));
-  const type: AuthorType = profile_url?.includes('/company/') ? 'company' : 'person';
+  // Organizations (company + school Pages) are 'company'; only /in/ members are 'person'.
+  const type: AuthorType =
+    profile_url != null && /\/(?:company|school)\//.test(profile_url) ? 'company' : 'person';
   const name = cleanText(nameLink?.textContent) ?? cleanText(link?.getAttribute('aria-label'));
 
   return { name, profile_url, type };
@@ -64,7 +68,7 @@ export interface SurfaceHeader {
 export function findSurfaceHeader(post: Element): SurfaceHeader | null {
   for (const node of post.querySelectorAll('span, div, a')) {
     if (node.childElementCount > 4 || node.closest(COMMENT_LIST_SELECTOR)) continue;
-    if (node.querySelector('[data-testid="expandable-text-box"]')) continue; // the post/comment body
+    if (node.querySelector(EXPANDABLE_TEXT_SELECTOR)) continue; // the post/comment body
     const text = cleanText(node.textContent);
     if (!text || text.length > 90) continue;
     const kind = ENGAGEMENT_SURFACE_PATTERN.test(text)
@@ -83,11 +87,11 @@ export function extractComments(post: Element): CommentSignal[] {
   const comments: CommentSignal[] = [];
   const seen = new Set<Element>();
   for (const list of post.querySelectorAll(COMMENT_LIST_SELECTOR)) {
-    for (const box of list.querySelectorAll('[data-testid="expandable-text-box"]')) {
+    for (const box of list.querySelectorAll(EXPANDABLE_TEXT_SELECTOR)) {
       const container = commentContainer(box, list);
       if (!container || seen.has(container)) continue;
       seen.add(container);
-      const link = container.querySelector('a[href*="/in/"]');
+      const link = container.querySelector(PERSON_LINK_SELECTOR);
       comments.push({
         author_name: shortName(
           cleanText(link?.textContent) ?? cleanText(link?.getAttribute('aria-label')),
@@ -113,7 +117,7 @@ function surfaceName(header: Element, text: string): string | null {
 function commentContainer(box: Element, list: Element): Element | null {
   let node = box.parentElement;
   while (node && node !== list && list.contains(node)) {
-    if (node.querySelector('a[href*="/in/"]')) return node;
+    if (node.querySelector(PERSON_LINK_SELECTOR)) return node;
     node = node.parentElement;
   }
   return null;
@@ -141,7 +145,8 @@ export function extractCounts(post: Element): Counts {
   let reaction: number | null = null;
   let comment: number | null = null;
   for (const node of post.querySelectorAll('span, button, a')) {
-    if (node.closest('[data-testid*="commentList" i]')) continue;
+    // Count labels are leaf-ish; skip large containers before reading textContent (subtree walk).
+    if (node.childElementCount > 3 || node.closest(COMMENT_LIST_SELECTOR)) continue;
     const text = cleanText(node.textContent);
     if (!text || text.length > 40) continue;
     if (reaction == null) {

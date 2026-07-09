@@ -20,17 +20,6 @@ export function queryText(root: ParentNode, selectors: readonly string[]): strin
   return cleanText(el?.textContent);
 }
 
-/** Trimmed non-empty value of `attr` on the first matching descendant, else null. */
-export function queryAttr(
-  root: ParentNode,
-  selectors: readonly string[],
-  attr: string,
-): string | null {
-  const el = queryFirst(root, selectors);
-  const value = el?.getAttribute(attr)?.trim();
-  return value ? value : null;
-}
-
 /** Every descendant matching any selector, de-duplicated. */
 export function queryAll(root: ParentNode, selectors: readonly string[]): Element[] {
   const seen = new Set<Element>();

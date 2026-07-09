@@ -2,6 +2,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   BRIDGE_SOURCE,
+  isValidCapturedPost,
   postCapture,
   postControl,
   postHello,
@@ -51,5 +52,68 @@ describe('post helpers', () => {
     });
     expect(spy.mock.calls[2]?.[0]).toMatchObject({ source: BRIDGE_SOURCE, kind: 'capture' });
     spy.mockRestore();
+  });
+});
+
+describe('readBridgeMessage field validation', () => {
+  it('rejects control without a boolean enabled and capture without an array posts', () => {
+    expect(
+      readBridgeMessage(event({ source: BRIDGE_SOURCE, kind: 'control', enabled: 'yes' })),
+    ).toBeNull();
+    expect(
+      readBridgeMessage(event({ source: BRIDGE_SOURCE, kind: 'capture', posts: 'oops' })),
+    ).toBeNull();
+    expect(readBridgeMessage(event({ source: BRIDGE_SOURCE, kind: 'bogus' }))).toBeNull();
+  });
+  it('accepts well-formed control and capture', () => {
+    expect(
+      readBridgeMessage(event({ source: BRIDGE_SOURCE, kind: 'capture', posts: [] })),
+    ).toMatchObject({
+      kind: 'capture',
+    });
+  });
+});
+
+describe('isValidCapturedPost', () => {
+  it('accepts a well-formed post', () => {
+    expect(isValidCapturedPost(stubPayload({ linkedin_post_id: 'urn:li:activity:123' }))).toBe(
+      true,
+    );
+    expect(
+      isValidCapturedPost(
+        stubPayload({
+          linkedin_post_id: 'urn:li:ugcPost:9',
+          author_profile_url: 'https://www.linkedin.com/in/ada/',
+        }),
+      ),
+    ).toBe(true);
+  });
+
+  it('rejects a forged/malformed post', () => {
+    // bad URN shape (would poison the dedup key)
+    expect(isValidCapturedPost(stubPayload({ linkedin_post_id: 'not-a-urn' }))).toBe(false);
+    // off-LinkedIn url / profile url
+    expect(
+      isValidCapturedPost(
+        stubPayload({ linkedin_post_id: 'urn:li:activity:1', url: 'https://evil.example.com/x' }),
+      ),
+    ).toBe(false);
+    expect(
+      isValidCapturedPost(
+        stubPayload({
+          linkedin_post_id: 'urn:li:activity:1',
+          author_profile_url: 'https://evil.example.com/in/x',
+        }),
+      ),
+    ).toBe(false);
+    // wrong container types / non-objects
+    expect(
+      isValidCapturedPost({
+        ...stubPayload({ linkedin_post_id: 'urn:li:activity:1' }),
+        comments: 'nope',
+      }),
+    ).toBe(false);
+    expect(isValidCapturedPost(null)).toBe(false);
+    expect(isValidCapturedPost('string')).toBe(false);
   });
 });

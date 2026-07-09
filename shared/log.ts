@@ -6,8 +6,9 @@
  */
 const PREFIX = '[hanabi]';
 
+/** Dev-only debug (stripped from distribution builds so capture identifiers aren't logged in prod). */
 export function logDebug(...args: unknown[]): void {
-  console.debug(PREFIX, ...args);
+  if (import.meta.env.DEV) console.debug(PREFIX, ...args);
 }
 
 export function logWarn(...args: unknown[]): void {

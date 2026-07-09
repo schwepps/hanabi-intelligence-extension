@@ -16,4 +16,16 @@ describe('DedupStore', () => {
     expect(store.size).toBe(2);
     expect(store.has('c')).toBe(false);
   });
+
+  it('evicts the oldest id past the cap (bounded memory)', () => {
+    const store = new DedupStore(2);
+    store.add('a');
+    store.add('b');
+    store.add('c'); // over cap → evicts oldest ('a')
+    expect(store.size).toBe(2);
+    expect(store.has('a')).toBe(false);
+    expect(store.has('b')).toBe(true);
+    expect(store.has('c')).toBe(true);
+    expect(store.add('a')).toBe(true); // evicted, so treated as new again
+  });
 });

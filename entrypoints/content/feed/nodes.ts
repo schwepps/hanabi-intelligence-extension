@@ -1,4 +1,4 @@
-import { FEED_TESTID } from './selectors';
+import { AUTHOR_LINK_SELECTORS, EXPANDABLE_TEXT_SELECTOR, FEED_TESTID } from './selectors';
 
 /** The feed container element, or null if not mounted / not on the feed. */
 export function findFeedRoot(scope: ParentNode): Element | null {
@@ -15,9 +15,8 @@ export function findPostNodes(feedRoot: Element): Element[] {
 }
 
 export function isPostNode(el: Element): boolean {
-  const hasAuthor = el.querySelector('a[href*="/in/"], a[href*="/company/"]') !== null;
+  const hasAuthor = el.querySelector(AUTHOR_LINK_SELECTORS.join(',')) !== null;
   const hasBody =
-    el.querySelector('[data-testid="expandable-text-box"]') !== null ||
-    el.querySelector('img') !== null;
+    el.querySelector(EXPANDABLE_TEXT_SELECTOR) !== null || el.querySelector('img') !== null;
   return hasAuthor && hasBody;
 }

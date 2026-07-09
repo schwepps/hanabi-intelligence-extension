@@ -1,7 +1,12 @@
 import { consentGranted } from '@/shared/consent';
 import { logDebug } from '@/shared/log';
 import { sendPostCaptured } from '@/shared/messages';
-import { postControl, readBridgeMessage } from '@/shared/window-bridge';
+import {
+  isValidCapturedPost,
+  MAX_CAPTURE_POSTS,
+  postControl,
+  readBridgeMessage,
+} from '@/shared/window-bridge';
 import { DedupStore } from './dedup';
 import { isFeedUrl, watchFeed } from './gate';
 
@@ -25,7 +30,9 @@ export default defineContentScript({
         return;
       }
       if (message.kind === 'capture' && enabled) {
-        for (const payload of message.posts) {
+        // The bridge is forgeable — validate every payload before dedup/forward, and cap volume.
+        for (const payload of message.posts.slice(0, MAX_CAPTURE_POSTS)) {
+          if (!isValidCapturedPost(payload)) continue;
           if (seen.add(payload.linkedin_post_id)) sendPostCaptured(payload);
         }
       }

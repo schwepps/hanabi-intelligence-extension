@@ -72,30 +72,6 @@ export interface CommentSignal {
   text: string | null;
 }
 
-/**
- * Fields whose absence forces the whole post to be skipped (no usable record without them).
- * Only the dedup key is truly load-bearing; everything else fails soft to a default.
- */
-export const REQUIRED_FIELDS = [
-  'linkedin_post_id',
-] as const satisfies readonly (keyof PostPayload)[];
-
-/**
- * Non-null defaults applied when an optional field cannot be extracted. Nullable string fields
- * default to `null` and are handled at the composition site; these are the meaningful non-null ones.
- */
-export const FIELD_DEFAULTS: {
-  author_type: AuthorType;
-  post_type: PostType;
-  is_repost: boolean;
-  reaction_count: number;
-  comment_count: number;
-  author_degree: AuthorDegree;
-} = {
-  author_type: 'person',
-  post_type: 'text',
-  is_repost: false,
-  reaction_count: 0,
-  comment_count: 0,
-  author_degree: 'none',
-};
+// The only load-bearing field is `linkedin_post_id` (the dedup key); assemble.ts skips a post when it
+// is missing and applies each field's contract default inline. No separate defaults/required tables —
+// they drifted from the single composition site (assemble.ts) without adding value.

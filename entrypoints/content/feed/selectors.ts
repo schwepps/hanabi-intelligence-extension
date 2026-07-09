@@ -6,17 +6,19 @@
  * ones that survived the SDUI migration: `data-testid`s, `aria-label` text, and href paths. The
  * post's activity URN is NOT in the DOM — it is read from React props in the MAIN world (react-urn.ts).
  */
-export const SELECTOR_MAP_VERSION = '2026.07-sdui.1';
-
 /** The feed container (virtualized list of posts). */
 export const FEED_TESTID = 'mainFeed';
 
-/** Post body text (already rendered; clamped behind "see more" but present). */
-export const POST_TEXT_SELECTORS = ['[data-testid="expandable-text-box"]'] as const;
+/** The rendered post/comment body (LinkedIn reuses this testid for both, clamped behind "see more"). */
+export const EXPANDABLE_TEXT_SELECTOR = '[data-testid="expandable-text-box"]';
+export const POST_TEXT_SELECTORS = [EXPANDABLE_TEXT_SELECTOR] as const;
 
-/** Author/actor profile links — the href PATH (`/in/` vs `/company/`) is the stable type signal. */
+/** A person's profile link — used where only `/in/` actors are wanted (post nodes, commenters). */
+export const PERSON_LINK_SELECTOR = 'a[href*="/in/"]';
+
+/** Author/actor profile links — the href PATH (`/in/` vs `/company/` vs `/school/`) is the type signal. */
 export const AUTHOR_LINK_SELECTORS = [
-  'a[href*="/in/"]',
+  PERSON_LINK_SELECTOR,
   'a[href*="/company/"]',
   'a[href*="/school/"]',
 ] as const;
