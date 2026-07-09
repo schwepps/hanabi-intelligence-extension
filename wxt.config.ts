@@ -1,5 +1,5 @@
 import { defineConfig } from 'wxt';
-import { backendOrigin } from './shared/backend';
+import { backendOrigin, HOSTED_BACKEND_ORIGIN } from './shared/backend';
 
 // See https://wxt.dev/api/config.html
 export default defineConfig({
@@ -13,12 +13,28 @@ export default defineConfig({
     description:
       'Passively captures LinkedIn feed posts for the Hanabi collective. Read-only, no automation.',
     // Minimal by design: a declared content-script `matches` is enough to inject.
-    // `storage` backs the consent flag + linked sensor identity (see shared/consent.ts, shared/identity.ts).
-    permissions: ['storage'],
-    // Narrow: only the backend origin the onboarding page calls to validate the token + record consent
-    // (GET /api/sensor/me, POST /api/sensor/consent — FSC-98/FSC-111). The send-queue reuses this host.
+    // `storage` backs the consent flag + linked sensor identity + the send queue (shared/consent.ts,
+    // shared/identity.ts, background/queue.ts). `alarms` drives the send-queue retry backoff
+    // (FSC-112) — the only MV3-durable wake primitive; no user-facing permission warning.
+    permissions: ['storage', 'alarms'],
+    // Narrow: only the backend origin the onboarding page and the send-queue call
+    // (GET /api/sensor/me, POST /api/sensor/consent, POST /api/ingest — FSC-98/FSC-111/FSC-112).
     host_permissions: [`${backendOrigin(mode === 'production')}/*`],
   }),
+  hooks: {
+    // Refuse to produce a distribution ZIP (`pnpm zip`, mode 'production') while the hosted origin is
+    // still the FSC-107 placeholder — a hard stop beats shipping an extension that posts to a backend
+    // that doesn't exist. Gated on `zip:start` (the actual release artifact), NOT `build:before`, so
+    // CI's `pnpm build`, `pnpm dev`, and `wxt prepare`/typecheck are all unaffected.
+    'zip:start': (wxt) => {
+      if (wxt.config.mode === 'production' && HOSTED_BACKEND_ORIGIN.endsWith('.example')) {
+        throw new Error(
+          `Refusing to zip: hosted backend origin is still the placeholder "${HOSTED_BACKEND_ORIGIN}". ` +
+            'Set the real EU origin in shared/backend.ts (FSC-107).',
+        );
+      }
+    },
+  },
   imports: {
     // Emit a flat-config file (.wxt/eslint-auto-imports.mjs) exposing WXT's auto-imported
     // globals. `9` is ESLint's flat-config format version (compatible with ESLint 9 and 10),
