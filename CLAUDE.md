@@ -107,12 +107,20 @@ the backend schema exactly.
   consent copy already covers commenter data.
 - **Field confidence on the 2026 SDUI feed** (validated live): production-grade = `linkedin_post_id`
   (+ derived `url`), author name/profile_url/type, `text`, `reaction_count`, `hashtags`,
-  `social_proof`, `comments`, `post_type=video`. Best-effort/deferred (default until a durable anchor
-  lands) = `comment_count`, `author_degree`, `posted_at_raw`, repost provenance (`is_repost` is set
-  from the surface header; `original_author_*` deferred), `author_company`/`title`, `media_title`, and
+  `social_proof`, `comments`, `post_type=video`, and repost provenance (`is_repost` +
+  `original_author_*`, FSC-115). Best-effort/deferred (default until a durable anchor lands) =
+  `comment_count`, `author_degree`, `posted_at_raw`, `author_company`/`title`, `media_title`, and
   non-video `post_type`. `social_proof` comes from the context header ("X a aimé/commenté ceci") and
   the author is taken from the actor block excluding that header, so a surfaced post attributes to the
   poster, not the surfacing connection.
+- **Repost provenance** (`resolveRepost` in `feed/fields.ts`, FSC-115): the original author is captured
+  for both reshare shapes, never the resharer — a plain reshare ("X a republié ceci") renders the
+  original below the header so `author` (header excluded) already IS the original; a quote-repost
+  (reshare-with-thoughts) carries the original inside an embedded card anchored on its `/feed/update/`
+  link (`findResharedCard`). If the original author can't be resolved, the post is downgraded to
+  `is_repost:false` — never a resharer-attributed repost (the backend refine requires a non-null
+  `original_author_name`). The quote-repost anchor is grounded on a live reshare permalink and validated
+  absent from 70+ live feed posts; in-feed quote-repost rendering is pending re-confirmation.
 
 ## Guardrails (critical)
 

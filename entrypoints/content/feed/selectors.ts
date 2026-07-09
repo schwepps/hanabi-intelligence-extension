@@ -42,6 +42,16 @@ export const COMMENT_COUNT_PATTERN = /(\d[\d.,\s']*)\s*(?:commentaires?|comments
 export const COMMENT_LIST_SELECTOR = '[data-testid*="commentList" i]';
 
 /**
+ * A quote-repost (reshare-with-thoughts) embeds the original post as a nested card that links to the
+ * original UPDATE (`/feed/update/…`). Grounded on a live quote-repost: the original author + body sit
+ * inside that card, distinct from the resharer above it. A plain (non-reshare) feed post exposes no
+ * such link — validated absent across 70+ live feed posts — so its presence marks the embedded original.
+ * Anchors the reshared-card scan in `findResharedCard`; the post's own URN comes from React props, never
+ * a DOM `/feed/update/` link.
+ */
+export const RESHARED_UPDATE_LINK_SELECTOR = 'a[href*="/feed/update/"]';
+
+/**
  * Context-header verbs (the line above a post) that mark a SOCIAL-PROOF surfacing — a 1st-degree
  * connection engaged with the post. Localized (FR + EN). Distinct from a repost surfacing.
  */

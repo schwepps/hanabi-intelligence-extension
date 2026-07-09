@@ -86,13 +86,13 @@ session already produced — no clicks, scrolls, or network calls to LinkedIn.
 
 **Production-grade:** `linkedin_post_id` (+ derived `url`), `author_name`,
 `author_profile_url`, `author_type`, `text`, `reaction_count`, `hashtags`, `social_proof`
-(the connection who surfaced the post), and `comments[]` (commenter + text). `post_type`
-reliably detects `video`.
+(the connection who surfaced the post), `comments[]` (commenter + text), and repost
+provenance (`is_repost` + `original_author_*` — the reshared post's original author, never
+the resharer). `post_type` reliably detects `video`.
 
 **Best-effort / tracked follow-ups** (default until a durable SDUI anchor is found):
-`comment_count`, `author_degree`, `posted_at_raw`, repost provenance (original author),
-`author_company` / `author_title`, `media_title`, and `image` / `multi_image` / `document`
-/ `poll` / `article` `post_type`.
+`comment_count`, `author_degree`, `posted_at_raw`, `author_company` / `author_title`,
+`media_title`, and `image` / `multi_image` / `document` / `poll` / `article` `post_type`.
 
 The selector/anchor conventions live in `entrypoints/content/feed/selectors.ts`; the fragile
 DOM knowledge is isolated there and in `feed/react-urn.ts` so a LinkedIn change is a

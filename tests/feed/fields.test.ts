@@ -7,7 +7,9 @@ import {
   extractCounts,
   extractHashtags,
   extractText,
+  findResharedCard,
   findSurfaceHeader,
+  resolveRepost,
 } from '@/entrypoints/content/feed/fields';
 import { fragment } from '../support/dom';
 
@@ -153,6 +155,161 @@ describe('findSurfaceHeader + social proof', () => {
       '<div><a href="https://www.linkedin.com/in/x/">X</a><div data-testid="expandable-text-box">hello</div></div>',
     );
     expect(findSurfaceHeader(plain)).toBeNull();
+  });
+});
+
+/** A plain reshare ("X a republié ceci"): the original post renders below the resharer verb-line. */
+const resharePost = () =>
+  fragment(`
+    <div>
+      <div><a href="https://www.linkedin.com/in/rey/">Rey Resharer</a> a republié ceci</div>
+      <div>
+        <a href="https://www.linkedin.com/in/grace/" aria-label="Grace"><img alt="" /></a>
+        <a href="https://www.linkedin.com/in/grace/"><span>Grace Hopper</span></a>
+      </div>
+      <div data-testid="expandable-text-box">original post body</div>
+    </div>`);
+
+describe('resolveRepost', () => {
+  it('attributes a plain reshare to the original author (the poster below the header), not the resharer', () => {
+    const post = resharePost();
+    const header = findSurfaceHeader(post);
+    const author = extractAuthor(post, header?.el);
+    expect(resolveRepost(post, header, author)).toEqual({
+      is_repost: true,
+      original_author_name: 'Grace Hopper',
+      original_author_profile_url: 'https://www.linkedin.com/in/grace/',
+    });
+  });
+
+  it('is not a repost when there is no repost header', () => {
+    const post = surfacedPost(); // engagement header, not a reshare
+    const header = findSurfaceHeader(post);
+    const author = extractAuthor(post, header?.el);
+    expect(resolveRepost(post, header, author)).toEqual({
+      is_repost: false,
+      original_author_name: null,
+      original_author_profile_url: null,
+    });
+  });
+
+  it('downgrades to non-repost when the original author cannot be resolved (never resharer-less)', () => {
+    const post = fragment(
+      '<div><span>Quelqu\'un a republié ceci</span><div data-testid="expandable-text-box">body, no author link</div></div>',
+    );
+    const header = findSurfaceHeader(post);
+    const author = extractAuthor(post, header?.el);
+    expect(header?.kind).toBe('repost');
+    expect(author.name).toBeNull();
+    expect(resolveRepost(post, header, author)).toEqual({
+      is_repost: false,
+      original_author_name: null,
+      original_author_profile_url: null,
+    });
+  });
+});
+
+/**
+ * A quote-repost (reshare-with-thoughts): resharer actor + commentary on top, then a nested embedded
+ * card holding the original author + a link to the original update. Mirrors the live DOM validated on
+ * a real reshare (outer author = resharer; original author = the company inside the embedded card).
+ */
+const quoteRepost = () =>
+  fragment(`
+    <div>
+      <a href="https://www.linkedin.com/in/rey/" aria-label="Rey"><img alt="" /></a>
+      <a href="https://www.linkedin.com/in/rey/"><span>Rey Resharer</span></a>
+      <div data-testid="expandable-text-box">Merci pour cet outil !</div>
+      <div class="reshared-card">
+        <a href="https://www.linkedin.com/company/acme/" aria-label="Acme"><img alt="" /></a>
+        <a href="https://www.linkedin.com/company/acme/"><span>Acme Corp</span></a>
+        <a href="https://www.linkedin.com/feed/update/urn:li:share:123/"><div data-testid="expandable-text-box">Original body</div></a>
+      </div>
+    </div>`);
+
+describe('findResharedCard + quote-repost provenance', () => {
+  it('finds the embedded reshared card via its /feed/update/ link', () => {
+    const card = findResharedCard(quoteRepost());
+    expect(card).not.toBeNull();
+    // the card holds the original author, not the resharer
+    expect(card?.querySelector('a[href*="/company/acme/"]')).not.toBeNull();
+    expect(card?.querySelector('a[href*="/in/rey/"]')).toBeNull();
+  });
+
+  it('returns null for a post with no embedded reshared card', () => {
+    expect(findResharedCard(resharePost())).toBeNull();
+    expect(
+      findResharedCard(fragment('<div><a href="https://www.linkedin.com/in/x/">X</a></div>')),
+    ).toBeNull();
+  });
+
+  it('attributes a quote-repost to the embedded original author, not the resharer', () => {
+    const post = quoteRepost();
+    const header = findSurfaceHeader(post);
+    const author = extractAuthor(post, header?.el);
+    expect(author.name).toBe('Rey Resharer'); // outer author is the resharer
+    expect(resolveRepost(post, header, author)).toEqual({
+      is_repost: true,
+      original_author_name: 'Acme Corp',
+      original_author_profile_url: 'https://www.linkedin.com/company/acme/',
+    });
+  });
+
+  it('returns null (not a repost) when the update link has no actor-bearing ancestor below the post', () => {
+    // a non-reshare post that merely links to another update — the link climbs straight to `post`
+    const post = fragment(
+      '<div><a href="https://www.linkedin.com/in/dave/"><span>Dave</span></a><div data-testid="expandable-text-box">see this</div><a href="https://www.linkedin.com/feed/update/urn:li:activity:999/">link</a></div>',
+    );
+    expect(findResharedCard(post)).toBeNull();
+    const header = findSurfaceHeader(post);
+    expect(resolveRepost(post, header, extractAuthor(post, header?.el))).toEqual({
+      is_repost: false,
+      original_author_name: null,
+      original_author_profile_url: null,
+    });
+  });
+
+  it('ignores a /feed/update/ link inside a preview comment (no false repost)', () => {
+    const post = fragment(`
+      <div>
+        <a href="https://www.linkedin.com/in/dave/"><span>Dave</span></a>
+        <div data-testid="expandable-text-box">my post</div>
+        <div data-testid="commentList-XYZ">
+          <div><a href="https://www.linkedin.com/in/carol/"><span>Carol</span></a><a href="https://www.linkedin.com/feed/update/urn:li:activity:5/"><div data-testid="expandable-text-box">nice</div></a></div>
+        </div>
+      </div>`);
+    expect(findResharedCard(post)).toBeNull();
+  });
+
+  it('downgrades when the reshared card resolves back to the resharer (never attribute to resharer)', () => {
+    // the update link's nearest actor-bearing ancestor holds the SAME (outer) author
+    const post = fragment(
+      '<div><div><a href="https://www.linkedin.com/in/dave/"><span>Dave</span></a><div data-testid="expandable-text-box">thoughts</div><a href="https://www.linkedin.com/feed/update/urn:li:activity:9/">link</a></div></div>',
+    );
+    const header = findSurfaceHeader(post);
+    const author = extractAuthor(post, header?.el);
+    expect(findResharedCard(post)).not.toBeNull(); // the card is found...
+    expect(resolveRepost(post, header, author)).toEqual({
+      is_repost: false, // ...but it resolves to the resharer, so we downgrade
+      original_author_name: null,
+      original_author_profile_url: null,
+    });
+  });
+
+  it('downgrades when the embedded card has no resolvable original author', () => {
+    const post = fragment(`
+      <div>
+        <a href="https://www.linkedin.com/in/rey/"><span>Rey Resharer</span></a>
+        <div data-testid="expandable-text-box">thoughts</div>
+        <div>
+          <a href="https://www.linkedin.com/company/acme/"><img alt="" /></a>
+          <a href="https://www.linkedin.com/feed/update/urn:li:share:1/"><div data-testid="expandable-text-box">body</div></a>
+        </div>
+      </div>`);
+    const header = findSurfaceHeader(post);
+    const author = extractAuthor(post, header?.el);
+    expect(findResharedCard(post)).not.toBeNull();
+    expect(resolveRepost(post, header, author)).toMatchObject({ is_repost: false });
   });
 });
 

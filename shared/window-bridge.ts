@@ -108,10 +108,23 @@ function isValidComment(value: unknown): boolean {
 }
 
 /**
+ * A repost must carry its original author: the backend refine (FSC-98) rejects `is_repost: true` with
+ * a null `original_author_name`, and we never attribute a reshare to the resharer. Non-reposts have no
+ * such requirement. Mirrors the extension-side invariant `resolveRepost` already upholds (FSC-115).
+ * Assumes `is_repost` is already type-checked as a boolean by the caller.
+ */
+function isValidRepostProvenance(post: Record<string, unknown>): boolean {
+  if (post.is_repost !== true) return true;
+  return (
+    typeof post.original_author_name === 'string' && post.original_author_name.trim().length > 0
+  );
+}
+
+/**
  * Validate an inbound capture payload before it is trusted/forwarded. The bridge is forgeable, so a
  * `capture` message can carry arbitrary objects — accept only well-formed posts: a real post URN as
- * the dedup key, linkedin.com hosts on the urls, sane non-negative counts, and well-typed elements in
- * the `hashtags` / `comments` arrays.
+ * the dedup key, linkedin.com hosts on the urls, sane non-negative counts, a repost that names its
+ * original author, and well-typed elements in the `hashtags` / `comments` arrays.
  */
 export function isValidCapturedPost(value: unknown): value is PostPayload {
   if (typeof value !== 'object' || value === null) return false;
@@ -121,6 +134,9 @@ export function isValidCapturedPost(value: unknown): value is PostPayload {
     POST_URN_RE.test(post.linkedin_post_id) &&
     isLinkedInUrl(post.url) &&
     isNullableLinkedInUrl(post.author_profile_url) &&
+    isNullableLinkedInUrl(post.original_author_profile_url) &&
+    typeof post.is_repost === 'boolean' &&
+    isValidRepostProvenance(post) &&
     isCount(post.reaction_count) &&
     isCount(post.comment_count) &&
     Array.isArray(post.hashtags) &&
