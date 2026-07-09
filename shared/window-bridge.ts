@@ -108,10 +108,24 @@ function isValidComment(value: unknown): boolean {
 }
 
 /**
+ * Validate `original_author_name` for BOTH branches. It must always be a nullable string — the guard
+ * claims `value is PostPayload` and the forgeable bridge could send an object, which would slip through
+ * to the wire and 422 the backend batch. When `is_repost` is true the backend refine (FSC-98) also
+ * requires it non-empty (we never attribute a reshare to the resharer). Mirrors the invariant
+ * `resolveRepost` already upholds (FSC-115). Assumes `is_repost` is already type-checked as a boolean.
+ */
+function isValidRepostProvenance(post: Record<string, unknown>): boolean {
+  const name = post.original_author_name;
+  if (name !== null && typeof name !== 'string') return false;
+  if (post.is_repost !== true) return true;
+  return typeof name === 'string' && name.trim().length > 0;
+}
+
+/**
  * Validate an inbound capture payload before it is trusted/forwarded. The bridge is forgeable, so a
  * `capture` message can carry arbitrary objects — accept only well-formed posts: a real post URN as
- * the dedup key, linkedin.com hosts on the urls, sane non-negative counts, and well-typed elements in
- * the `hashtags` / `comments` arrays.
+ * the dedup key, linkedin.com hosts on the urls, sane non-negative counts, a repost that names its
+ * original author, and well-typed elements in the `hashtags` / `comments` arrays.
  */
 export function isValidCapturedPost(value: unknown): value is PostPayload {
   if (typeof value !== 'object' || value === null) return false;
@@ -121,6 +135,9 @@ export function isValidCapturedPost(value: unknown): value is PostPayload {
     POST_URN_RE.test(post.linkedin_post_id) &&
     isLinkedInUrl(post.url) &&
     isNullableLinkedInUrl(post.author_profile_url) &&
+    isNullableLinkedInUrl(post.original_author_profile_url) &&
+    typeof post.is_repost === 'boolean' &&
+    isValidRepostProvenance(post) &&
     isCount(post.reaction_count) &&
     isCount(post.comment_count) &&
     Array.isArray(post.hashtags) &&

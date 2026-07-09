@@ -75,4 +75,54 @@ describe('assemblePost', () => {
       social_proof: null,
     });
   });
+
+  it('populates the original author on a plain reshare', () => {
+    const reshare = fragment(`
+      <div>
+        <div><a href="https://www.linkedin.com/in/rey/">Rey Resharer</a> a republié ceci</div>
+        <a href="https://www.linkedin.com/in/grace/" aria-label="Grace"><img alt="" /></a>
+        <a href="https://www.linkedin.com/in/grace/"><span>Grace Hopper</span></a>
+        <div data-testid="expandable-text-box">original body</div>
+      </div>`);
+    const payload = assemblePost(reshare, 'urn:li:activity:11', ctx);
+    expect(payload).toMatchObject({
+      is_repost: true,
+      author_name: 'Grace Hopper',
+      original_author_name: 'Grace Hopper',
+      original_author_profile_url: 'https://www.linkedin.com/in/grace/',
+    });
+  });
+
+  it('downgrades a repost with an unresolvable original author to is_repost:false', () => {
+    const reshare = fragment(
+      '<div><span>Quelqu\'un a republié ceci</span><div data-testid="expandable-text-box">body</div></div>',
+    );
+    const payload = assemblePost(reshare, 'urn:li:activity:12', ctx);
+    expect(payload).toMatchObject({
+      is_repost: false,
+      original_author_name: null,
+      original_author_profile_url: null,
+    });
+  });
+
+  it('attributes a quote-repost to the embedded original author, not the resharer', () => {
+    // resharer commentary on top; original author + update-link inside a nested embedded card
+    const quote = fragment(`
+      <div>
+        <a href="https://www.linkedin.com/in/rey/" aria-label="Rey"><img alt="" /></a>
+        <a href="https://www.linkedin.com/in/rey/"><span>Rey Resharer</span></a>
+        <div data-testid="expandable-text-box">Merci pour cet outil !</div>
+        <div>
+          <a href="https://www.linkedin.com/company/acme/"><span>Acme Corp</span></a>
+          <a href="https://www.linkedin.com/feed/update/urn:li:share:123/"><div data-testid="expandable-text-box">Original body</div></a>
+        </div>
+      </div>`);
+    const payload = assemblePost(quote, 'urn:li:activity:13', ctx);
+    expect(payload).toMatchObject({
+      is_repost: true,
+      author_name: 'Rey Resharer',
+      original_author_name: 'Acme Corp',
+      original_author_profile_url: 'https://www.linkedin.com/company/acme/',
+    });
+  });
 });

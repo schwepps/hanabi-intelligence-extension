@@ -1,6 +1,6 @@
 import { isLinkedInHost } from '@/shared/linkedin-url';
 import type { AuthorType, CommentSignal, PostType } from '@/shared/payload';
-import { cleanText, queryAll, queryText } from '../dom';
+import { cleanText, queryAll, queryFirst, queryText } from '../dom';
 import { parseLocalizedCount } from '../parse/number';
 import {
   AUTHOR_LINK_SELECTORS,
@@ -13,6 +13,7 @@ import {
   POST_TEXT_SELECTORS,
   REACTION_COUNT_PATTERN,
   REPOST_SURFACE_PATTERN,
+  RESHARED_UPDATE_LINK_SELECTOR,
   VIDEO_SELECTORS,
 } from './selectors';
 
@@ -81,6 +82,78 @@ export function findSurfaceHeader(post: Element): SurfaceHeader | null {
     return { el: node, kind, name: surfaceName(node, text) };
   }
   return null;
+}
+
+export interface RepostInfo {
+  is_repost: boolean;
+  /** The reshared post's original author — never the resharer. Null when not a (resolvable) repost. */
+  original_author_name: string | null;
+  original_author_profile_url: string | null;
+}
+
+/**
+ * The nested reshared-post card of a quote-repost (reshare-with-thoughts). The original post renders
+ * in an embedded card that links to its own update; we anchor on that `/feed/update/` link (skipping
+ * any inside a preview comment thread, as the sibling extractors do) and climb to the nearest ancestor
+ * carrying an author actor link — that container IS the original post's card, holding the original
+ * author (distinct from the resharer above it). Grounded on a live quote-repost. Returns null for a
+ * plain feed post (no embedded-update link).
+ */
+export function findResharedCard(post: Element): Element | null {
+  const embedded = [...post.querySelectorAll(RESHARED_UPDATE_LINK_SELECTOR)].find(
+    (link) => !link.closest(COMMENT_LIST_SELECTOR),
+  );
+  if (!embedded) return null;
+  let node = embedded.parentElement;
+  while (node && node !== post) {
+    if (queryFirst(node, AUTHOR_LINK_SELECTORS)) return node;
+    node = node.parentElement;
+  }
+  return null;
+}
+
+/**
+ * Resolve the reshared post's ORIGINAL author (never the resharer), across both reshare shapes:
+ *  - Quote-repost (reshare-with-thoughts): the outer author is the resharer; the original author lives
+ *    in the embedded reshared card (`findResharedCard`), extracted with the same `extractAuthor`.
+ *  - Plain reshare: the surface header is the resharer verb-line and the rendered `author` (that header
+ *    excluded from the scan) is already the original poster — so we attribute to `author`, not `header.name`.
+ *
+ * Never attributes to the resharer: if the card resolves back to the outer `author` (an over-captured
+ * subtree, or a non-reshare that merely links to an update) we treat it as unresolved. And because the
+ * backend rejects a repost with a null `original_author_name` (FSC-98 refine), an unresolved original
+ * downgrades to a non-repost rather than emit a resharer-attributed record (FSC-115 AC #3).
+ */
+export function resolveRepost(
+  post: Element,
+  header: SurfaceHeader | null,
+  author: AuthorInfo,
+): RepostInfo {
+  const card = findResharedCard(post);
+  if (card) {
+    const original = extractAuthor(card);
+    if (original.name && !isSameActor(original, author)) {
+      return {
+        is_repost: true,
+        original_author_name: original.name,
+        original_author_profile_url: original.profile_url,
+      };
+    }
+  }
+  if (header?.kind === 'repost' && author.name) {
+    return {
+      is_repost: true,
+      original_author_name: author.name,
+      original_author_profile_url: author.profile_url,
+    };
+  }
+  return { is_repost: false, original_author_name: null, original_author_profile_url: null };
+}
+
+/** Whether two extracted authors are the same actor (by profile URL, else by name). */
+function isSameActor(a: AuthorInfo, b: AuthorInfo): boolean {
+  if (a.profile_url !== null && a.profile_url === b.profile_url) return true;
+  return a.name !== null && a.name === b.name;
 }
 
 /** Visible preview comments (commenter identity + text) — an engagement/warm-intro signal. */

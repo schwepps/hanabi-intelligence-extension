@@ -7,6 +7,7 @@ import {
   extractHashtags,
   extractText,
   findSurfaceHeader,
+  resolveRepost,
 } from './fields';
 
 export interface AssembleContext {
@@ -20,12 +21,15 @@ export interface AssembleContext {
  *
  * Production-confidence fields (validated against the live feed): linkedin_post_id, url,
  * author_name/profile_url/type, text, reaction_count, hashtags, post_type (video), social_proof
- * (from an engagement context header), and comments. Best-effort / deferred fields default here and
- * are hardened in later passes: author_company, author_title, posted_at_raw, author_degree,
- * comment_count, repost provenance (original author), media_title, and non-video post_type.
+ * (from an engagement context header), comments, and repost provenance — original author for both a
+ * plain reshare and a quote-repost (`resolveRepost`, FSC-115). Best-effort / deferred fields default
+ * here and are hardened in later passes: author_company, author_title, posted_at_raw, author_degree,
+ * comment_count, media_title, and non-video post_type.
  *
  * The surface header is resolved first: it feeds social_proof + is_repost AND is excluded from the
- * author scan, so on a surfaced post the author is the poster, not the surfacing connection.
+ * author scan, so on a surfaced post the author is the poster, not the surfacing connection. On a
+ * plain reshare that means `author` IS the original poster; a quote-repost's original author comes from
+ * the embedded reshared card. Either way `resolveRepost` attributes to the original, never the resharer.
  */
 export function assemblePost(
   post: Element,
@@ -36,6 +40,7 @@ export function assemblePost(
 
   const header = findSurfaceHeader(post);
   const author = extractAuthor(post, header?.el);
+  const repost = resolveRepost(post, header, author);
   const counts = extractCounts(post);
 
   return {
@@ -49,9 +54,9 @@ export function assemblePost(
     author_company: null,
     author_title: null,
     post_type: classifyPostType(post),
-    is_repost: header?.kind === 'repost',
-    original_author_name: null,
-    original_author_profile_url: null,
+    is_repost: repost.is_repost,
+    original_author_name: repost.original_author_name,
+    original_author_profile_url: repost.original_author_profile_url,
     media_title: null,
     hashtags: extractHashtags(post),
     reaction_count: counts.reaction_count,

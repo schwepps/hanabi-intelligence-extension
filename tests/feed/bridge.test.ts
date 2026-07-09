@@ -89,6 +89,19 @@ describe('isValidCapturedPost', () => {
     ).toBe(true);
   });
 
+  it('accepts a repost that names its original author', () => {
+    expect(
+      isValidCapturedPost(
+        stubPayload({
+          linkedin_post_id: 'urn:li:activity:5',
+          is_repost: true,
+          original_author_name: 'Grace Hopper',
+          original_author_profile_url: 'https://www.linkedin.com/in/grace/',
+        }),
+      ),
+    ).toBe(true);
+  });
+
   it('rejects a forged/malformed post', () => {
     // bad URN shape (would poison the dedup key)
     expect(isValidCapturedPost(stubPayload({ linkedin_post_id: 'not-a-urn' }))).toBe(false);
@@ -152,5 +165,48 @@ describe('isValidCapturedPost', () => {
     ).toBe(false);
     expect(isValidCapturedPost(null)).toBe(false);
     expect(isValidCapturedPost('string')).toBe(false);
+  });
+
+  it('rejects a repost with no original author (backend refine invariant)', () => {
+    // is_repost with the default null original_author_name — the exact shape the backend 422s
+    expect(
+      isValidCapturedPost(stubPayload({ linkedin_post_id: 'urn:li:activity:1', is_repost: true })),
+    ).toBe(false);
+    // a forged truthy-but-not-boolean is_repost must not bypass the provenance guard (type confusion)
+    expect(
+      isValidCapturedPost({
+        ...stubPayload({ linkedin_post_id: 'urn:li:activity:1' }),
+        is_repost: 1,
+      } as unknown),
+    ).toBe(false);
+    // whitespace-only original author name is not a real author
+    expect(
+      isValidCapturedPost(
+        stubPayload({
+          linkedin_post_id: 'urn:li:activity:1',
+          is_repost: true,
+          original_author_name: '   ',
+        }),
+      ),
+    ).toBe(false);
+    // off-LinkedIn original author profile url
+    expect(
+      isValidCapturedPost(
+        stubPayload({
+          linkedin_post_id: 'urn:li:activity:1',
+          is_repost: true,
+          original_author_name: 'Grace Hopper',
+          original_author_profile_url: 'https://evil.example.com/in/grace',
+        }),
+      ),
+    ).toBe(false);
+    // a forged non-string original_author_name must be rejected even when is_repost is false
+    // (the guard claims `value is PostPayload`; a non-string would 422 the backend batch)
+    expect(
+      isValidCapturedPost({
+        ...stubPayload({ linkedin_post_id: 'urn:li:activity:1', is_repost: false }),
+        original_author_name: {},
+      } as unknown),
+    ).toBe(false);
   });
 });
