@@ -8,8 +8,8 @@ beyond what a feed post renders.** Captured posts are forwarded to the Hanabi ba
 
 Built with [WXT](https://wxt.dev) (Manifest V3, Chromium target) in strict TypeScript.
 
-> Status: **feed capture** (FSC-110), **onboarding + consent** (FSC-111), and the **authenticated
-> send-queue** (FSC-112) are implemented against LinkedIn's 2026 Server-Driven-UI feed. Capture is
+> Status: **feed capture**, **onboarding + consent**, and the **authenticated
+> send-queue** are implemented against LinkedIn's 2026 Server-Driven-UI feed. Capture is
 > **off by default** and starts only after the sensor consents; captured posts are queued in the
 > background worker and POSTed to the ingestion API with retry/backoff and dedup.
 
@@ -134,7 +134,7 @@ entrypoints/
     dedup.ts                   # per-tab dedup by post id
     observer.ts                # debounced MutationObserver helper
     parse/                     # localized number + degree parsers
-  onboarding/                  # first-launch consent screen + sensor-token linking (FSC-111)
+  onboarding/                  # first-launch consent screen + sensor-token linking
   popup/                       # capture on/off toggle + link status
 shared/
   payload.ts                   # PostPayload + CommentSignal (capture contract SSOT)
