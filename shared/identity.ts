@@ -1,6 +1,6 @@
 /**
- * Sensor identity — the link between this install and the sensor's backend identity (FSC-111).
- * `token` is the raw ingestion bearer credential; it authenticates every submission (FSC-98) and the
+ * Sensor identity — the link between this install and the sensor's backend identity.
+ * `token` is the raw ingestion bearer credential; it authenticates every submission and the
  * send-queue (later ticket) reads it from here. Persisted in `browser.storage.local` (isolated from
  * web pages, survives worker restarts). Cleared identity ⇒ the sensor must (re)link via onboarding.
  */

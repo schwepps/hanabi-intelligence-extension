@@ -1,5 +1,5 @@
 /**
- * One authenticated batch POST to the ingestion backend (`POST /api/ingest`, FSC-98) + classification
+ * One authenticated batch POST to the ingestion backend (`POST /api/ingest`) + classification
  * of the response into a drain action. Mirrors the auth/base-URL idiom of `shared/sensor-api.ts`
  * (`Authorization: Bearer <token>`, `BASE_URL = backendOrigin(import.meta.env.PROD)`), but unlike the
  * onboarding calls it returns a discriminated union instead of throwing: the drain must branch several

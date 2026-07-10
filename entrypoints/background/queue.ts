@@ -47,7 +47,7 @@ export async function enqueue(payload: PostPayload): Promise<boolean> {
     if (queue.some((entry) => entry.id === id)) return false;
 
     // Drop `comments[]` before persisting: the send-time allowlist (`toIngestPost`) never transmits
-    // commenter PII (deferred to FSC-114), so storing it at rest would be unused third-party data — a
+    // commenter PII (deferred), so storing it at rest would be unused third-party data — a
     // data-minimization gap. Strip it here so the at-rest footprint matches what we actually send.
     const stored: PostPayload = { ...payload, comments: [] };
     const next = [...queue, { id, payload: stored, enqueuedAt: Date.now() }];

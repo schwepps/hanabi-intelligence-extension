@@ -6,11 +6,11 @@ import { handleInstalled } from './install';
 import { onRetryAlarm } from './scheduler';
 
 export default defineBackground(() => {
-  // Open the onboarding/consent screen on first install (FSC-111). Registered synchronously at the
+  // Open the onboarding/consent screen on first install. Registered synchronously at the
   // top of the body so a cold-started MV3 worker still catches the one-shot onInstalled event.
   browser.runtime.onInstalled.addListener((details) => void handleInstalled(details));
 
-  // Send-queue wiring (FSC-112). This entrypoint is pure wiring: every listener registers
+  // Send-queue wiring. This entrypoint is pure wiring: every listener registers
   // synchronously so a waking worker catches its trigger, and all behavior lives in ./drain and its
   // collaborators (queue, send, backoff, scheduler — each unit-tested).
   browser.runtime.onStartup.addListener(() => void drain()); // browser restart: resume any backlog

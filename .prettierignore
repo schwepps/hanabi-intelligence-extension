@@ -4,6 +4,6 @@ node_modules
 pnpm-lock.yaml
 .context
 
-# Brand tokens copied VERBATIM from Hanabi-app (FSC-90). Kept byte-identical to the source of
+# Brand tokens copied VERBATIM from Hanabi-app. Kept byte-identical to the source of
 # truth (synced by hand — no shared package); do not let Prettier re-tune it.
 assets/tokens.css

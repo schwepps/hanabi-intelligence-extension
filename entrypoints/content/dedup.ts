@@ -2,7 +2,7 @@
  * Session dedup: capture each post at most once per tab. Content scripts persist for the tab's
  * lifetime (unlike the ephemeral service worker), so this in-memory set survives SPA navigation
  * and observer restarts. Keys on the stable post URN, never node identity — so a re-rendered or
- * recycled node for an already-seen post is a no-op. The backend (FSC-98) is the durable dedup.
+ * recycled node for an already-seen post is a no-op. The backend is the durable dedup.
  */
 /** Cap on remembered ids so a days-long session can't grow the set unbounded. */
 const DEFAULT_MAX_ENTRIES = 5000;

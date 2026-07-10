@@ -1,5 +1,5 @@
 /**
- * First-launch onboarding trigger (FSC-111). Opens the full-tab consent screen once, on FRESH
+ * First-launch onboarding trigger. Opens the full-tab consent screen once, on FRESH
  * install only — never on extension update or browser update. Extracted from the background entry so
  * the branch is unit-testable. Opening the extension's own page needs no `tabs` permission.
  */

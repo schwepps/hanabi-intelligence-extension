@@ -32,7 +32,7 @@ export interface AuthorInfo {
   name: string | null;
   profile_url: string | null;
   type: AuthorType;
-  /** Author's connection degree to the sensor, read from the rendered name badge (FSC-116). */
+  /** Author's connection degree to the sensor, read from the rendered name badge. */
   degree: AuthorDegree;
 }
 
@@ -43,7 +43,7 @@ export interface AuthorInfo {
  *
  * The degree badge renders as a suffix INSIDE the name link's text ("Victor Taki • 2e"), so we
  * parse the degree from that raw text and then strip the badge off the name (`shortName`) — else
- * `author_name` leaks "• 2e" / "• Suivi" (FSC-116). Reads only the rendered badge; the connection
+ * `author_name` leaks "• 2e" / "• Suivi". Reads only the rendered badge; the connection
  * list is never enumerated (guardrail).
  *
  * Links inside `excludeHeader` (a social-proof context header) and inside embedded comment threads
@@ -151,8 +151,8 @@ export function findResharedCard(post: Element): Element | null {
  *
  * Never attributes to the resharer: if the card resolves back to the outer `author` (an over-captured
  * subtree, or a non-reshare that merely links to an update) we treat it as unresolved. And because the
- * backend rejects a repost with a null `original_author_name` (FSC-98 refine), an unresolved original
- * downgrades to a non-repost rather than emit a resharer-attributed record (FSC-115 AC #3).
+ * backend rejects a repost with a null `original_author_name`, an unresolved original
+ * downgrades to a non-repost rather than emit a resharer-attributed record.
  */
 export function resolveRepost(
   post: Element,
@@ -315,7 +315,7 @@ function authorContainer(post: Element, excludeHeader?: Element | null): Element
 }
 
 /**
- * Best-effort author company/title from the headline subtitle (FSC-118). Scans the actor block only
+ * Best-effort author company/title from the headline subtitle. Scans the actor block only
  * (never the body), and splits the FIRST leaf whose first `|`/`·`/`•` segment matches "X chez/at/@ Y"
  * — else both null. FR headlines are noisy free-text taglines, so we never guess a company from one.
  */
@@ -365,7 +365,7 @@ function isArticleShare(post: Element): boolean {
 }
 
 /**
- * The document/carousel title from its "<title> · N pages" badge (FSC-117), gated on `document` — the
+ * The document/carousel title from its "<title> · N pages" badge, gated on `document` — the
  * only classified type with a clean title, so we never grab an arbitrary heading off a `text` post.
  * Best-effort: the badge's containing element ends with the localized "N pages" tail, and we keep the
  * title before it. Null otherwise — article-card titles are too noisy to extract cleanly, and

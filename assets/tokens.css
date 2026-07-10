@@ -4,7 +4,7 @@
    SOURCE OF TRUTH for the brand's visual language. Framework-neutral: plain CSS
    custom properties + @keyframes ONLY. Do NOT add Tailwind directives here — the
    Tailwind mapping lives in globals.css (@theme inline). Keeping this file pure
-   CSS is what lets it be copied VERBATIM into the Hanabi-extension repo (FSC-111
+   CSS is what lets it be copied VERBATIM into the Hanabi-extension repo (the
    consent screen); there is no shared package, so the two copies are synced by
    hand. Values are pre-checked for WCAG AA on their intended backgrounds — do not
    re-tune hexes when transcribing.

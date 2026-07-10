@@ -89,7 +89,7 @@ describe('isValidCapturedPost', () => {
     ).toBe(true);
   });
 
-  it('accepts populated enum + best-effort string fields (FSC-116/117/118)', () => {
+  it('accepts populated enum + best-effort string fields', () => {
     expect(
       isValidCapturedPost(
         stubPayload({

@@ -25,7 +25,7 @@ export function isPostCapturedMessage(message: unknown): message is PostCaptured
 /**
  * Fire-and-forget: capture must never block the sensor's scroll on a background ack. If the
  * service worker is waking or momentarily absent (mid-reload), the send rejects and we drop it —
- * durable delivery is the send-queue ticket's responsibility, not FSC-110's.
+ * durable delivery is the send-queue's responsibility, not the capture layer's.
  */
 export function sendPostCaptured(payload: PostPayload): void {
   const message: PostCapturedMessage = { type: POST_CAPTURED, payload };

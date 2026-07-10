@@ -126,9 +126,9 @@ function isValidComment(value: unknown): boolean {
 /**
  * Validate `original_author_name` for BOTH branches. It must always be a nullable string — the guard
  * claims `value is PostPayload` and the forgeable bridge could send an object, which would slip through
- * to the wire and 422 the backend batch. When `is_repost` is true the backend refine (FSC-98) also
+ * to the wire and 422 the backend batch. When `is_repost` is true the backend refine also
  * requires it non-empty (we never attribute a reshare to the resharer). Mirrors the invariant
- * `resolveRepost` already upholds (FSC-115). Assumes `is_repost` is already type-checked as a boolean.
+ * `resolveRepost` already upholds. Assumes `is_repost` is already type-checked as a boolean.
  */
 function isValidRepostProvenance(post: Record<string, unknown>): boolean {
   const name = post.original_author_name;
@@ -156,7 +156,7 @@ export function isValidCapturedPost(value: unknown): value is PostPayload {
     isValidRepostProvenance(post) &&
     isCount(post.reaction_count) &&
     isCount(post.comment_count) &&
-    // Enums (FSC-116/117): reject an out-of-enum value that would 422 the whole batch.
+    // Enums: reject an out-of-enum value that would 422 the whole batch.
     isMember(AUTHOR_TYPES, post.author_type) &&
     isMember(POST_TYPES, post.post_type) &&
     isMember(AUTHOR_DEGREES, post.author_degree) &&

@@ -49,6 +49,6 @@ export default defineContentScript({
 
     void evaluate();
     watchFeed(() => void evaluate()); // SPA route changes
-    consentGranted.watch(() => void evaluate()); // consent toggled live (FSC-111)
+    consentGranted.watch(() => void evaluate()); // consent toggled live
   },
 });

@@ -15,22 +15,22 @@ export default defineConfig({
     // Minimal by design: a declared content-script `matches` is enough to inject.
     // `storage` backs the consent flag + linked sensor identity + the send queue (shared/consent.ts,
     // shared/identity.ts, background/queue.ts). `alarms` drives the send-queue retry backoff
-    // (FSC-112) — the only MV3-durable wake primitive; no user-facing permission warning.
+    // — the only MV3-durable wake primitive; no user-facing permission warning.
     permissions: ['storage', 'alarms'],
     // Narrow: only the backend origin the onboarding page and the send-queue call
-    // (GET /api/sensor/me, POST /api/sensor/consent, POST /api/ingest — FSC-98/FSC-111/FSC-112).
+    // (GET /api/sensor/me, POST /api/sensor/consent, POST /api/ingest).
     host_permissions: [`${backendOrigin(mode === 'production')}/*`],
   }),
   hooks: {
     // Refuse to produce a distribution ZIP (`pnpm zip`, mode 'production') while the hosted origin is
-    // still the FSC-107 placeholder — a hard stop beats shipping an extension that posts to a backend
+    // still the hosted-origin placeholder — a hard stop beats shipping an extension that posts to a backend
     // that doesn't exist. Gated on `zip:start` (the actual release artifact), NOT `build:before`, so
     // CI's `pnpm build`, `pnpm dev`, and `wxt prepare`/typecheck are all unaffected.
     'zip:start': (wxt) => {
       if (wxt.config.mode === 'production' && HOSTED_BACKEND_ORIGIN.endsWith('.example')) {
         throw new Error(
           `Refusing to zip: hosted backend origin is still the placeholder "${HOSTED_BACKEND_ORIGIN}". ` +
-            'Set the real EU origin in shared/backend.ts (FSC-107).',
+            'Set the real EU origin in shared/backend.ts.',
         );
       }
     },
