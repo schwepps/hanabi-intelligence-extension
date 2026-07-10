@@ -121,6 +121,14 @@ describe('isValidCapturedPost', () => {
     expect(isValidCapturedPost({ ...base, posted_at_raw: {} } as unknown)).toBe(false);
   });
 
+  it('rejects a non-string core wire string (author_name / text / social_proof / captured_at)', () => {
+    const base = stubPayload({ linkedin_post_id: 'urn:li:activity:2' });
+    expect(isValidCapturedPost({ ...base, author_name: 42 } as unknown)).toBe(false);
+    expect(isValidCapturedPost({ ...base, text: [] } as unknown)).toBe(false);
+    expect(isValidCapturedPost({ ...base, social_proof: {} } as unknown)).toBe(false);
+    expect(isValidCapturedPost({ ...base, captured_at: 123 } as unknown)).toBe(false);
+  });
+
   it('accepts a repost that names its original author', () => {
     expect(
       isValidCapturedPost(

@@ -51,11 +51,7 @@ export interface AuthorInfo {
  * surfacing connection (whose link comes first) or a commenter.
  */
 export function extractAuthor(post: Element, excludeHeader?: Element | null): AuthorInfo {
-  const links = queryAll(post, AUTHOR_LINK_SELECTORS).filter(
-    (a) => !a.closest(COMMENT_LIST_SELECTOR) && !(excludeHeader && excludeHeader.contains(a)),
-  );
-  const nameLink = links.find((a) => cleanText(a.textContent) !== null) ?? null;
-  const link = nameLink ?? links[0] ?? null;
+  const { nameLink, link } = resolveActor(post, excludeHeader);
 
   const profile_url = normalizeProfileUrl(link?.getAttribute('href'));
   // Organizations (company + school Pages) are 'company'; only /in/ members are 'person'.
@@ -63,9 +59,28 @@ export function extractAuthor(post: Element, excludeHeader?: Element | null): Au
     profile_url != null && /\/(?:company|school)\//.test(profile_url) ? 'company' : 'person';
   const rawName = cleanText(nameLink?.textContent) ?? cleanText(link?.getAttribute('aria-label'));
   const name = shortName(rawName);
-  const degree = parseAuthorDegree(rawName);
+  // Only members have a connection degree; a company/school Page has none — and its name could
+  // otherwise false-match the ordinal regex (e.g. "2nd Street" → 'second').
+  const degree = type === 'person' ? parseAuthorDegree(rawName) : 'none';
 
   return { name, profile_url, type, degree };
+}
+
+/**
+ * Resolve the author's actor link: the candidate profile links (excluding the surface header and
+ * comment threads), the first text-bearing one as `nameLink`, and `link` as the resolved actor
+ * (name link, else the first candidate). Shared by `extractAuthor` (name/degree/type) and
+ * `authorContainer` (company/title scope) so both always describe the SAME actor.
+ */
+function resolveActor(
+  post: Element,
+  excludeHeader?: Element | null,
+): { nameLink: Element | null; link: Element | null } {
+  const links = queryAll(post, AUTHOR_LINK_SELECTORS).filter(
+    (a) => !a.closest(COMMENT_LIST_SELECTOR) && !(excludeHeader && excludeHeader.contains(a)),
+  );
+  const nameLink = links.find((a) => cleanText(a.textContent) !== null) ?? null;
+  return { nameLink, link: nameLink ?? links[0] ?? null };
 }
 
 export interface SurfaceHeader {
@@ -282,12 +297,9 @@ export interface AuthorHeadline {
 
 /** The bounded actor block around the author name link (climbs up, but never swallows the body). */
 function authorContainer(post: Element, excludeHeader?: Element | null): Element | null {
-  const links = queryAll(post, AUTHOR_LINK_SELECTORS).filter(
-    (a) => !a.closest(COMMENT_LIST_SELECTOR) && !(excludeHeader && excludeHeader.contains(a)),
-  );
-  const nameLink = links.find((a) => cleanText(a.textContent) !== null) ?? links[0] ?? null;
-  if (!nameLink) return null;
-  let node: Element = nameLink;
+  const { link } = resolveActor(post, excludeHeader);
+  if (!link) return null;
+  let node: Element = link;
   for (let i = 0; i < 5 && node.parentElement && node.parentElement !== post; i++) {
     if (node.parentElement.querySelector(EXPANDABLE_TEXT_SELECTOR)) break; // don't swallow the body
     node = node.parentElement;
@@ -346,13 +358,14 @@ function isArticleShare(post: Element): boolean {
 }
 
 /**
- * The document/carousel title from its "<title> · N pages" badge (FSC-117), gated on the classified
- * type so we never grab an arbitrary heading off a `text` post. Best-effort: the badge's containing
- * element ends with the localized "N pages" tail, and we keep the title before it. Null otherwise —
- * article-card titles are too noisy to extract cleanly, so they stay null until a durable anchor lands.
+ * The document/carousel title from its "<title> · N pages" badge (FSC-117), gated on `document` — the
+ * only classified type with a clean title, so we never grab an arbitrary heading off a `text` post.
+ * Best-effort: the badge's containing element ends with the localized "N pages" tail, and we keep the
+ * title before it. Null otherwise — article-card titles are too noisy to extract cleanly, and
+ * multi_image is not yet classified, so both stay null until a durable anchor lands.
  */
 export function extractMediaTitle(post: Element, type: PostType): string | null {
-  if (type !== 'document' && type !== 'multi_image') return null;
+  if (type !== 'document') return null;
   for (const el of post.querySelectorAll('span, div, p')) {
     if (el.childElementCount > 6 || el.closest(COMMENT_LIST_SELECTOR)) continue;
     if (el.closest(EXPANDABLE_TEXT_SELECTOR)) continue;

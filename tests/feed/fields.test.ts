@@ -63,6 +63,14 @@ describe('extractAuthor', () => {
     expect(extractAuthor(post).degree).toBe('none');
   });
 
+  it('never derives a degree for a company whose name starts with an ordinal', () => {
+    // "2nd Street" would match the degree regex, but a company Page has no connection degree.
+    const post = fragment(
+      '<div><a href="https://www.linkedin.com/company/2nd-street/"><span>2nd Street</span></a></div>',
+    );
+    expect(extractAuthor(post)).toMatchObject({ type: 'company', degree: 'none' });
+  });
+
   it('classifies a company page author and strips tracking query', () => {
     const post = fragment(
       `<div>${authorBlock('https://www.linkedin.com/company/globex/?trk=x', 'Globex')}</div>`,

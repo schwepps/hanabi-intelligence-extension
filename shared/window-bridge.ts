@@ -153,11 +153,15 @@ export function isValidCapturedPost(value: unknown): value is PostPayload {
     isMember(AUTHOR_TYPES, post.author_type) &&
     isMember(POST_TYPES, post.post_type) &&
     isMember(AUTHOR_DEGREES, post.author_degree) &&
-    // Best-effort strings (FSC-116/118): nullable, but never a non-string.
+    // Every nullable free-form wire string: nullable, but never a non-string (else it 422s the batch).
+    isNullableString(post.author_name) &&
+    isNullableString(post.text) &&
+    isNullableString(post.social_proof) &&
     isNullableString(post.author_company) &&
     isNullableString(post.author_title) &&
     isNullableString(post.media_title) &&
     isNullableString(post.posted_at_raw) &&
+    typeof post.captured_at === 'string' &&
     Array.isArray(post.hashtags) &&
     post.hashtags.every((tag) => typeof tag === 'string') &&
     Array.isArray(post.comments) &&
