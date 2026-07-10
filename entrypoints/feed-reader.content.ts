@@ -1,6 +1,6 @@
-import type { PostPayload } from '@/shared/payload';
 import { postCapture, postHello, readBridgeMessage } from '@/shared/window-bridge';
 import { assemblePost, type AssembleContext } from './content/feed/assemble';
+import { collectPosts, createCollectState } from './content/feed/collect';
 import { findFeedRoot, findPostNodes } from './content/feed/nodes';
 import { extractActivityUrn } from './content/feed/react-urn';
 import { createFeedObserver, type FeedObserver } from './content/observer';
@@ -17,21 +17,20 @@ export default defineContentScript({
   runAt: 'document_idle',
   main() {
     const context: AssembleContext = { now: () => new Date().toISOString() };
-    // Skip already-extracted element instances so persistent posts aren't re-walked (React-props
-    // traversal) on every settle; the isolated side is still the durable dedup by URN.
-    const seenNodes = new WeakSet<Element>();
+    // A node captured (or abandoned after retries) is marked done so persistent posts aren't
+    // re-walked (React-props traversal) on every settle; a node still hydrating on first sight is
+    // retried on later settles rather than skipped forever. The isolated side is the durable dedup.
+    const collectState = createCollectState();
     let observer: FeedObserver | null = null;
 
     const scan = (): void => {
       const feedRoot = findFeedRoot(document);
       if (!feedRoot) return;
-      const posts: PostPayload[] = [];
-      for (const node of findPostNodes(feedRoot)) {
-        if (seenNodes.has(node)) continue;
-        seenNodes.add(node);
-        const payload = assemblePost(node, extractActivityUrn(node), context);
-        if (payload) posts.push(payload);
-      }
+      const posts = collectPosts(
+        findPostNodes(feedRoot),
+        (node) => assemblePost(node, extractActivityUrn(node), context),
+        collectState,
+      );
       if (posts.length > 0) postCapture(posts);
     };
 
