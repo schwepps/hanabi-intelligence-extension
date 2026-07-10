@@ -64,12 +64,13 @@ export interface IngestSuccessBody {
   failed?: { linkedin_post_id: string; error: string }[];
 }
 
-/** Uniform error body for every non-2xx. `issues` is present on a 422 schema rejection. */
+/** Uniform error body for every non-2xx. `issues` is present on a 422 schema rejection. The backend
+ * serializes each issue `path` as a dot-joined string, e.g. `"posts.1.author_name"` (NOT an array). */
 export interface IngestErrorBody {
   error: {
     code: string;
     message: string;
-    issues?: { path: (string | number)[]; message: string }[];
+    issues?: { path: string; message: string }[];
   };
 }
 

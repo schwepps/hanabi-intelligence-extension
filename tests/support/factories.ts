@@ -7,7 +7,7 @@ export function stubPayload(
   return {
     text: null,
     url: `https://www.linkedin.com/feed/update/${overrides.linkedin_post_id}/`,
-    author_name: null,
+    author_name: 'Ada Lovelace',
     author_company: null,
     author_title: null,
     author_profile_url: null,

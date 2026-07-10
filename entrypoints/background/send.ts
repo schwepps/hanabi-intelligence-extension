@@ -68,18 +68,30 @@ export async function submitBatch(
 }
 
 /**
- * A 422 rejects the whole batch on the first schema violation. Map each `issues[].path` (`['posts',
- * <index>, <field>]`) back to a `linkedin_post_id` and drop exactly those. If no post index is present
- * (an envelope-level error, e.g. a bad `version`), our request itself is malformed — halt rather than
- * drop good data or loop forever on an unchanged batch.
+ * A 422 rejects the whole batch on the first schema violation. Map each `issues[].path` back to a
+ * `linkedin_post_id` and drop exactly those. If no post index is present (an envelope-level error,
+ * e.g. a bad `version`), our request itself is malformed — halt rather than drop good data or loop
+ * forever on an unchanged batch.
  */
 async function classifyPoison(res: Response, posts: PostPayload[]): Promise<SubmitOutcome> {
   const body = (await res.json().catch(() => null)) as IngestErrorBody | null;
   const issues = Array.isArray(body?.error?.issues) ? body.error.issues : [];
   const dropIds = new Set<string>();
   for (const issue of issues) {
-    const index = issue.path?.[1];
-    if (typeof index === 'number' && posts[index]) dropIds.add(posts[index].linkedin_post_id);
+    const index = postIndexFromPath(issue.path);
+    if (index !== null && posts[index]) dropIds.add(posts[index].linkedin_post_id);
   }
   return dropIds.size === 0 ? { kind: 'halt' } : { kind: 'poison', dropIds: [...dropIds] };
+}
+
+/**
+ * Extract the batch post index from an issue path. The backend serializes `issue.path` as a
+ * dot-joined STRING — `"posts.<index>.<field>"` (hanabi-radar `route.ts`: `path.map(String).join('.')`);
+ * an envelope-level error (e.g. `"version"`) has no numeric index → null, so the caller halts. Guarded
+ * against a non-string/malformed shape so a proxy interstitial served as 422 can't throw.
+ */
+function postIndexFromPath(path: unknown): number | null {
+  if (typeof path !== 'string') return null;
+  const index = Number(path.split('.')[1]);
+  return Number.isInteger(index) && index >= 0 ? index : null;
 }

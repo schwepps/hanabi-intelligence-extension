@@ -106,6 +106,13 @@ function isNullableString(value: unknown): boolean {
   return value === null || typeof value === 'string';
 }
 
+/** A REQUIRED, non-blank wire string. Mirrors the backend `requiredText` (trim → min length 1).
+ * `author_name` is the one required free-form field: a null/blank value 422s the whole batch (and the
+ * drain's poison handling would then keep re-sending it), so it must never cross the boundary. */
+function isNonBlankString(value: unknown): boolean {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
 function isValidComment(value: unknown): boolean {
   if (typeof value !== 'object' || value === null) return false;
   const comment = value as Record<string, unknown>;
@@ -153,8 +160,10 @@ export function isValidCapturedPost(value: unknown): value is PostPayload {
     isMember(AUTHOR_TYPES, post.author_type) &&
     isMember(POST_TYPES, post.post_type) &&
     isMember(AUTHOR_DEGREES, post.author_degree) &&
-    // Every nullable free-form wire string: nullable, but never a non-string (else it 422s the batch).
-    isNullableString(post.author_name) &&
+    // author_name is REQUIRED non-blank on the wire (backend `requiredText`); a null/blank value
+    // would 422 the batch and, via the drain's poison handling, could stall the queue.
+    isNonBlankString(post.author_name) &&
+    // Every other free-form wire string: nullable, but never a non-string (else it 422s the batch).
     isNullableString(post.text) &&
     isNullableString(post.social_proof) &&
     isNullableString(post.author_company) &&

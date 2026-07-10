@@ -74,19 +74,19 @@ describe('submitBatch', () => {
     });
   });
 
-  it('drops only the schema-rejected post on 422 (by issues[].path index)', async () => {
+  it('drops only the schema-rejected post on 422 (by the dot-joined issues[].path index)', async () => {
     const posts = [
       stubPayload({ linkedin_post_id: urn(1) }),
       stubPayload({ linkedin_post_id: urn(2) }),
       stubPayload({ linkedin_post_id: urn(3) }),
     ];
+    // The backend serializes issue.path as a dot-joined STRING ("posts.<i>.<field>"),
+    // not an array — see hanabi-radar route.ts (`issue.path.map(String).join('.')`).
     stubFetch(() =>
       Promise.resolve(
         jsonResponse(
           422,
-          errorBody('invalid_payload', [
-            { path: ['posts', 1, 'posted_at_raw'], message: 'too long' },
-          ]),
+          errorBody('invalid_payload', [{ path: 'posts.1.posted_at_raw', message: 'too long' }]),
         ),
       ),
     );
@@ -99,10 +99,7 @@ describe('submitBatch', () => {
   it('halts on an envelope-level 422 (no post index) instead of looping forever', async () => {
     stubFetch(() =>
       Promise.resolve(
-        jsonResponse(
-          422,
-          errorBody('invalid_payload', [{ path: ['version'], message: 'invalid' }]),
-        ),
+        jsonResponse(422, errorBody('invalid_payload', [{ path: 'version', message: 'invalid' }])),
       ),
     );
 

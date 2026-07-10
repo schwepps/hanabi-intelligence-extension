@@ -118,7 +118,8 @@ describe('drain', () => {
           jsonResponse(422, {
             error: {
               code: 'invalid_payload',
-              issues: [{ path: ['posts', 1, 'posted_at_raw'], message: 'too long' }],
+              // Backend serializes issue.path as a dot-joined string ("posts.<i>.<field>").
+              issues: [{ path: 'posts.1.posted_at_raw', message: 'too long' }],
             },
           }),
         ),

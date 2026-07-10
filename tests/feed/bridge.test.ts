@@ -129,6 +129,14 @@ describe('isValidCapturedPost', () => {
     expect(isValidCapturedPost({ ...base, captured_at: 123 } as unknown)).toBe(false);
   });
 
+  it('rejects a null or blank author_name (backend requires a non-empty author → else it 422s the batch)', () => {
+    const base = stubPayload({ linkedin_post_id: 'urn:li:activity:3' });
+    expect(isValidCapturedPost({ ...base, author_name: null } as unknown)).toBe(false);
+    expect(isValidCapturedPost({ ...base, author_name: '' } as unknown)).toBe(false);
+    expect(isValidCapturedPost({ ...base, author_name: '   ' } as unknown)).toBe(false);
+    expect(isValidCapturedPost({ ...base, author_name: 'Ada Lovelace' })).toBe(true);
+  });
+
   it('accepts a repost that names its original author', () => {
     expect(
       isValidCapturedPost(
