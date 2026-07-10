@@ -1,22 +1,22 @@
-# CLAUDE.md — Hanabi-extension
+# CLAUDE.md — Hanabi Intelligence (Extension)
 
 > Concise by design: the linter owns style, this file owns commands, architecture, and
 > guardrails. Keep it in sync with reality; delete anything that goes stale.
 
 ## Context
 
-Hanabi Radar captures LinkedIn posts for the Hanabi collective's partners. This repo = **the
+Hanabi Intelligence captures LinkedIn posts for the Hanabi collective's partners. This repo = **the
 browser extension**: it **passively** reads the sensor's LinkedIn feed (in their
-already-logged-in session) and sends posts to the backend (separate repo `Hanabi-app`).
+already-logged-in session) and sends posts to the backend (separate repo `hanabi-intelligence`).
 
 **No automation** — we only read what the sensor already sees while scrolling → near-zero ban
 risk. The backend never talks to LinkedIn; all capture lives here.
 
 ("sensor" = a collective member who installed the extension and captures their own feed;
-matches the `sensors` table in `Hanabi-app`.)
+matches the `sensors` table in `hanabi-intelligence`.)
 
 Tickets: Linear (team FSC Consulting, label `Hanabi-extension`). The MVP spec and the payload
-contract live in `Hanabi-app`.
+contract live in `hanabi-intelligence`.
 
 ## Stack (as installed — keep in sync with `package.json`)
 
@@ -79,7 +79,7 @@ contract live in `Hanabi-app`.
   **Never hardcode the endpoint at a call site.** The hosted origin is a placeholder until the hosted
   backend lands; a `zip:start` guard fails `pnpm zip` on it so no distribution ships against it.
 
-## Payload contract (source of truth in `Hanabi-app` — conform strictly, invent nothing)
+## Payload contract (source of truth in `hanabi-intelligence` — conform strictly, invent nothing)
 
 Per post: `linkedin_post_id`, `text`, `url`, `author_name`, `author_company`, `author_title`,
 `author_profile_url`, `author_type`, `post_type`, `is_repost`, `original_author_name`,
@@ -151,5 +151,5 @@ back to the offending id, drops only that post, and retries the rest.
 
 - Do not automate any LinkedIn interaction, even "to go faster".
 - Do not widen manifest permissions for convenience.
-- Do not diverge from the payload contract without updating `Hanabi-app` in parallel.
+- Do not diverge from the payload contract without updating `hanabi-intelligence` in parallel.
 - Do not add a heavy UI framework — the UI is limited to onboarding/consent.

@@ -1,6 +1,6 @@
 /**
  * The ingestion wire contract — mirrors the backend's `POST /api/ingest`
- * (`hanabi-radar`). Isolated from `shared/payload.ts` (the extension's INTERNAL capture shape) because
+ * (`hanabi-intelligence`). Isolated from `shared/payload.ts` (the extension's INTERNAL capture shape) because
  * the wire shape is the backend's, not ours: the backend validates each post with `z.strictObject`,
  * so ANY key it doesn't know — `comments`, or a future `PostPayload` addition — rejects the whole
  * batch with 422. `toIngestPost` is an explicit allowlist so that can never happen by accident.

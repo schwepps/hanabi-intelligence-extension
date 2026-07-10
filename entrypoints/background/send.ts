@@ -92,7 +92,7 @@ const POST_PATH_INDEX_RE = /^posts\.(\d+)(?:\.|$)/;
 
 /**
  * Extract the batch post index from an issue path. The backend serializes `issue.path` as a
- * dot-joined STRING — `"posts.<index>.<field>"` (hanabi-radar `route.ts`: `path.map(String).join('.')`);
+ * dot-joined STRING — `"posts.<index>.<field>"` (hanabi-intelligence `route.ts`: `path.map(String).join('.')`);
  * anything without a `posts.<digits>` prefix (an envelope error, a non-post path, a malformed one, or a
  * non-string proxy body) yields null, so the caller halts rather than dropping a good post.
  */

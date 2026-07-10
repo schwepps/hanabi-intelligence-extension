@@ -1,4 +1,4 @@
-# Hanabi Radar — Extension
+# Hanabi Intelligence — Extension
 
 Browser extension that **passively** captures LinkedIn feed posts for the Hanabi
 collective. It only reads what a logged-in "sensor" — a collective member running the

@@ -9,7 +9,7 @@
 export const LOCAL_BACKEND_ORIGIN = 'http://127.0.0.1:3000';
 
 // TODO: set the real hosted EU origin before shipping a distribution build.
-export const HOSTED_BACKEND_ORIGIN = 'https://hanabi-radar.example';
+export const HOSTED_BACKEND_ORIGIN = 'https://hanabi-intelligence.example';
 
 /** Pick the backend origin for the current build. `isProduction` = `wxt build|zip` / `import.meta.env.PROD`. */
 export function backendOrigin(isProduction: boolean): string {

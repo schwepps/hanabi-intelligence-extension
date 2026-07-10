@@ -9,8 +9,54 @@
     <main class="hb-page">
       <section class="hb-card" aria-labelledby="hb-title">
         <header class="hb-brand">
-          <span class="hb-brand-mark" aria-hidden="true"></span>
-          <span class="hb-brand-word">Hanabi<span class="hb-brand-word-accent"> Radar</span></span>
+          <svg
+            class="hb-brand-mark"
+            viewBox="0 0 128 128"
+            fill="none"
+            aria-hidden="true"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <defs>
+              <radialGradient id="hb-logo-grad" cx="30%" cy="30%" r="85%">
+                <stop offset="0%" stop-color="#2e6be6" />
+                <stop offset="60%" stop-color="#1f4fd6" />
+                <stop offset="100%" stop-color="#143a9c" />
+              </radialGradient>
+            </defs>
+            <rect width="128" height="128" rx="29" fill="url(#hb-logo-grad)" />
+            <circle
+              cx="64"
+              cy="64"
+              r="42"
+              stroke="#fff"
+              stroke-opacity="0.3"
+              stroke-width="1.6"
+              fill="none"
+            />
+            <g id="hb-ray">
+              <line
+                x1="64"
+                y1="46"
+                x2="64"
+                y2="26"
+                stroke="#fff"
+                stroke-width="3.4"
+                stroke-linecap="round"
+              />
+              <circle cx="64" cy="22" r="4.6" fill="#fff" />
+            </g>
+            <use href="#hb-ray" transform="rotate(45 64 64)" />
+            <use href="#hb-ray" transform="rotate(90 64 64)" />
+            <use href="#hb-ray" transform="rotate(135 64 64)" />
+            <use href="#hb-ray" transform="rotate(180 64 64)" />
+            <use href="#hb-ray" transform="rotate(225 64 64)" />
+            <use href="#hb-ray" transform="rotate(270 64 64)" />
+            <use href="#hb-ray" transform="rotate(315 64 64)" />
+            <circle cx="64" cy="64" r="8.5" fill="#fff" />
+          </svg>
+          <span class="hb-brand-word"
+            >Hanabi<span class="hb-brand-word-accent"> Intelligence</span></span
+          >
         </header>
 
         <h1 id="hb-title" class="hb-title">Activez votre capteur Hanabi</h1>
@@ -86,7 +132,7 @@
           <h2 class="hb-h2">Capture activée ✓</h2>
           <p>
             Vous pouvez fermer cet onglet. Gérez la capture à tout moment depuis l'icône
-            <strong>Hanabi Radar</strong> de votre navigateur.
+            <strong>Hanabi Intelligence</strong> de votre navigateur.
           </p>
         </div>
       </section>

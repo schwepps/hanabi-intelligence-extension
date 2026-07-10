@@ -3,7 +3,7 @@ import { backendOrigin, HOSTED_BACKEND_ORIGIN } from './shared/backend';
 
 // See https://wxt.dev/api/config.html
 export default defineConfig({
-  // Pin the dev server off 3000: `next dev` (the radar backend) owns 3000, which the extension
+  // Pin the dev server off 3000: `next dev` (the hanabi-intelligence backend) owns 3000, which the extension
   // calls as its backend origin (shared/backend.ts). Both `wxt dev` and `next dev` default to
   // 3000, so without this the two race for the port and the extension hits the wrong server.
   dev: {
@@ -15,7 +15,7 @@ export default defineConfig({
   // `import.meta.env.PROD` also derives from the mode, so the manifest grant and the fetch target
   // stay aligned even under a `--mode` override. Origins come from shared/backend.ts (one source).
   manifest: ({ mode }) => ({
-    name: 'Hanabi Radar',
+    name: 'Hanabi Intelligence',
     description:
       'Passively captures LinkedIn feed posts for the Hanabi collective. Read-only, no automation.',
     // Minimal by design: a declared content-script `matches` is enough to inject.

@@ -81,7 +81,7 @@ describe('submitBatch', () => {
       stubPayload({ linkedin_post_id: urn(3) }),
     ];
     // The backend serializes issue.path as a dot-joined STRING ("posts.<i>.<field>"),
-    // not an array — see hanabi-radar route.ts (`issue.path.map(String).join('.')`).
+    // not an array — see hanabi-intelligence route.ts (`issue.path.map(String).join('.')`).
     stubFetch(() =>
       Promise.resolve(
         jsonResponse(
