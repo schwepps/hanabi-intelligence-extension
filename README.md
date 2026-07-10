@@ -76,8 +76,10 @@ a clean data model. So capture reads two surfaces of the _rendered_ feed:
   node's **React props** — it is in no DOM attribute. It extracts the other fields from the
   rendered DOM (resolved text, aria-labels, hrefs) and relays slim payloads.
 - **`entrypoints/content/index.ts` — isolated world**: owns the consent + feed-URL gate,
-  de-dupes by post id, and forwards to the background. It coordinates with the reader over a
-  `window.postMessage` bridge (`shared/window-bridge.ts`: `hello` / `control` / `capture`).
+  validates each post against the wire contract (dropping anything that would 422 the batch — e.g. a
+  post with no resolvable author), de-dupes by post id, and forwards to the background. It coordinates
+  with the reader over a `window.postMessage` bridge (`shared/window-bridge.ts`: `hello` / `control` /
+  `capture`).
 
 Everything is strictly passive: the reader only observes responses/DOM the sensor's own
 session already produced — no clicks, scrolls, or network calls to LinkedIn.
@@ -115,7 +117,7 @@ entrypoints/
     install.ts                 #   open onboarding on first install
     queue.ts                   #   durable FIFO queue (storage.local) + write mutex
     sent-ids.ts                #   persistent already-sent set (dedup across restarts)
-    send.ts                    #   authenticated batch POST + response classification
+    send.ts                    #   authenticated batch POST + outcome classification (422 → drop rejected post, retry rest)
     drain.ts                   #   drain state machine (batching, retry, opt-out abort)
     backoff.ts                 #   exponential backoff + persisted failure streak
     scheduler.ts               #   browser.alarms retry seam
@@ -142,7 +144,7 @@ shared/
   consent.ts                   # storage-backed consent flag (default off)
   backend.ts                   # backend origin by build mode (single source)
   messages.ts                  # typed content → background messaging
-  window-bridge.ts             # MAIN ↔ ISOLATED postMessage protocol
+  window-bridge.ts             # MAIN ↔ ISOLATED postMessage protocol + inbound capture validation
   log.ts                       # '[hanabi]' logging
 wxt.config.ts                  # manifest (permissions: ['storage', 'alarms']) + zip placeholder guard
 ```

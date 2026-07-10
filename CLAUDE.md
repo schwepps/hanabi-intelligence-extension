@@ -54,7 +54,8 @@ contract live in `Hanabi-app` (contract = ticket FSC-98).
   captured posts to the ingestion API (`POST /api/ingest`, batch envelope) authenticated with the
   sensor token, with retry/backoff and persistent dedup. `index.ts` is pure wiring; logic is split by
   responsibility — `queue.ts` (persistent FIFO + write mutex), `sent-ids.ts` (dedup), `send.ts` (batch
-  POST + response classification), `backoff.ts` / `scheduler.ts` (backoff over `browser.alarms`),
+  POST + outcome classification: 2xx forget · 422 poison-drop + retry · 413 re-chunk · transient backoff),
+  `backoff.ts` / `scheduler.ts` (backoff over `browser.alarms`),
   `drain.ts` (the state machine). Opt-out clears the queue and aborts any in-flight batch.
   - ⚠️ **MV3 workers are ephemeral.** The queue lives in `storage.local` (`storage.defineItem`), never
     in memory; an entry is removed only on a confirmed 2xx; retry is driven by `browser.alarms` /
@@ -89,7 +90,10 @@ The wire shape sent to `POST /api/ingest` is the batch envelope `{ version: 1, p
 `shared/ingestion.ts` projects each `PostPayload` onto the exact backend-accepted fields via an
 allowlist (`INGEST_POST_KEYS`, excludes `comments` — see below). The backend upserts idempotently on
 `linkedin_post_id`, so re-sending is safe; a 422 rejects the whole batch, so the allowlist must match
-the backend schema exactly.
+the backend schema exactly. One bad post can't stall the queue: the isolated content script rejects
+anything that would 422 before enqueue (`isValidCapturedPost` — non-blank `author_name`, in-enum values,
+LinkedIn-host URLs), and if a 422 still occurs `send.ts` maps the backend's dot-joined `issues[].path`
+back to the offending id, drops only that post, and retries the rest.
 
 - **`post_type`** (text | image | multi_image | video | document | poll | article): document/
   carousel and video posts carry their substance outside the text — without the format the
