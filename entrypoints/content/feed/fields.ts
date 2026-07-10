@@ -269,13 +269,20 @@ export function extractCounts(post: Element): Counts {
 /**
  * The post's own relative timestamp ("16 h", "3 j"), verbatim — the backend derives the date. Scans
  * short leaf nodes in DOM order (the actor timestamp precedes the body and any quote-repost inner
- * card), skipping comment threads. Accepts only a leaf that is JUST the timestamp (+ separators /
- * "Modifié"), so a headline that starts with a number ("5 ans …") is never mistaken for one. Null
- * when not rendered.
+ * card), skipping comment threads AND the post body — the actor timestamp lives in the actor block,
+ * never inside the body box, so excluding the body keeps a bare timestamp-like token in the text
+ * ("2h", "now") from being misread as the posted-at. Accepts only a leaf that is JUST the timestamp
+ * (+ separators / "Modifié"), so a headline that starts with a number ("5 ans …") is never mistaken
+ * for one. Null when not rendered.
  */
 export function extractPostedAt(post: Element): string | null {
   for (const node of post.querySelectorAll('span, a, button, time')) {
-    if (node.childElementCount > 2 || node.closest(COMMENT_LIST_SELECTOR)) continue;
+    if (
+      node.childElementCount > 2 ||
+      node.closest(COMMENT_LIST_SELECTOR) ||
+      node.closest(EXPANDABLE_TEXT_SELECTOR)
+    )
+      continue;
     const text = cleanText(node.textContent);
     if (!text || text.length > 40) continue;
     const match = POSTED_AT_PATTERN.exec(text);

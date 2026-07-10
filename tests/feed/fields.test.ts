@@ -158,6 +158,12 @@ describe('extractPostedAt', () => {
     const post = fragment('<div><div data-testid="commentList-x"><span>2 h</span></div></div>');
     expect(extractPostedAt(post)).toBeNull();
   });
+  it('ignores a timestamp-like token inside the post body', () => {
+    const post = fragment(
+      '<div><div data-testid="expandable-text-box"><span>2h</span></div></div>',
+    );
+    expect(extractPostedAt(post)).toBeNull();
+  });
   it('returns null when no timestamp is present', () => {
     expect(extractPostedAt(fragment('<div><span>Lead AI Architect</span></div>'))).toBeNull();
   });
