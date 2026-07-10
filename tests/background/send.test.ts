@@ -108,6 +108,20 @@ describe('submitBatch', () => {
     expect(outcome).toEqual({ kind: 'halt' });
   });
 
+  it('halts on a malformed or non-post 422 path instead of dropping post 0', async () => {
+    // `Number('') === 0`, and a non-`posts.` prefix must never false-positive onto a real post.
+    for (const path of ['posts..field', 'comments.1.text', 'posts', 'posts.x.field']) {
+      stubFetch(() =>
+        Promise.resolve(
+          jsonResponse(422, errorBody('invalid_payload', [{ path, message: 'bad' }])),
+        ),
+      );
+      await expect(
+        submitBatch([stubPayload({ linkedin_post_id: urn(1) })], 'tok'),
+      ).resolves.toEqual({ kind: 'halt' });
+    }
+  });
+
   it('treats 408, 429 and 5xx as transient (retry with backoff)', async () => {
     for (const status of [408, 429, 500, 503]) {
       stubFetch(() => Promise.resolve(jsonResponse(status, errorBody('err'))));

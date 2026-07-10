@@ -84,14 +84,20 @@ async function classifyPoison(res: Response, posts: PostPayload[]): Promise<Subm
   return dropIds.size === 0 ? { kind: 'halt' } : { kind: 'poison', dropIds: [...dropIds] };
 }
 
+// A post-level issue path is "posts.<index>.<field>" (dot-joined by the backend). Anchor on the
+// `posts.` prefix and capture the digit run so only a real post index matches — never an
+// envelope-level path ("version"), a non-post path ("comments.1.text"), or a malformed one
+// ("posts..field", where a bare Number('') would otherwise coerce to 0 and drop post 0).
+const POST_PATH_INDEX_RE = /^posts\.(\d+)(?:\.|$)/;
+
 /**
  * Extract the batch post index from an issue path. The backend serializes `issue.path` as a
  * dot-joined STRING — `"posts.<index>.<field>"` (hanabi-radar `route.ts`: `path.map(String).join('.')`);
- * an envelope-level error (e.g. `"version"`) has no numeric index → null, so the caller halts. Guarded
- * against a non-string/malformed shape so a proxy interstitial served as 422 can't throw.
+ * anything without a `posts.<digits>` prefix (an envelope error, a non-post path, a malformed one, or a
+ * non-string proxy body) yields null, so the caller halts rather than dropping a good post.
  */
 function postIndexFromPath(path: unknown): number | null {
   if (typeof path !== 'string') return null;
-  const index = Number(path.split('.')[1]);
-  return Number.isInteger(index) && index >= 0 ? index : null;
+  const match = POST_PATH_INDEX_RE.exec(path);
+  return match ? Number(match[1]) : null;
 }
