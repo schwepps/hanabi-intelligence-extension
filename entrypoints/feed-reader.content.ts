@@ -1,8 +1,10 @@
 import { postCapture, postHello, readBridgeMessage } from '@/shared/window-bridge';
 import { assemblePost, type AssembleContext } from './content/feed/assemble';
 import { collectPosts, createCollectState } from './content/feed/collect';
-import { findFeedRoot, findPostNodes } from './content/feed/nodes';
-import { extractActivityUrn } from './content/feed/react-urn';
+import { findFeedRoot, findPermalinkPostNode, findPostNodes } from './content/feed/nodes';
+import { extractActivityUrn, urnFromReactionFacepile } from './content/feed/react-urn';
+import { FEED_DETAIL_SELECTOR } from './content/feed/selectors';
+import { pageKind } from './content/gate';
 import { createFeedObserver, type FeedObserver } from './content/observer';
 
 /**
@@ -23,15 +25,33 @@ export default defineContentScript({
     const collectState = createCollectState();
     let observer: FeedObserver | null = null;
 
+    // On a permalink the post lives inside a container whose testid contains `commentList`, so we
+    // extract from a DETACHED clone — `closest(COMMENT_LIST_SELECTOR)` in the field extractors would
+    // otherwise escape up to that container and blank the post. The URN is read from the LIVE node
+    // first (facepile testid, then React props — a clone has neither).
+    const assemblePermalink = (node: Element) => {
+      const detail = document.querySelector(FEED_DETAIL_SELECTOR);
+      const urn = urnFromReactionFacepile(detail ?? document) ?? extractActivityUrn(node);
+      return assemblePost(node.cloneNode(true) as Element, urn, context);
+    };
+
     const scan = (): void => {
-      const feedRoot = findFeedRoot(document);
-      if (!feedRoot) return;
-      const posts = collectPosts(
-        findPostNodes(feedRoot),
-        (node) => assemblePost(node, extractActivityUrn(node), context),
-        collectState,
-      );
-      if (posts.length > 0) postCapture(posts);
+      const kind = pageKind(location.href);
+      if (kind === 'feed') {
+        const feedRoot = findFeedRoot(document);
+        if (!feedRoot) return;
+        const posts = collectPosts(
+          findPostNodes(feedRoot),
+          (node) => assemblePost(node, extractActivityUrn(node), context),
+          collectState,
+        );
+        if (posts.length > 0) postCapture(posts);
+      } else if (kind === 'permalink') {
+        const post = findPermalinkPostNode(document);
+        if (!post) return; // detail not hydrated yet — retried on the next settle
+        const posts = collectPosts([post], assemblePermalink, collectState);
+        if (posts.length > 0) postCapture(posts);
+      }
     };
 
     const start = (): void => {

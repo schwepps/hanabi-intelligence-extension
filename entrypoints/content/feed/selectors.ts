@@ -9,6 +9,24 @@
 /** The feed container (virtualized list of posts). */
 export const FEED_TESTID = 'mainFeed';
 
+/**
+ * Post-detail (permalink `/posts/<slug>`) anchors. The detail page has NO `mainFeed`; it renders the
+ * post + its comments as `[role="listitem"]`s inside a container whose auto-generated testid ends in
+ * `FEED_DETAIL` (and, incidentally, contains the substring `commentList` — see the collision note on
+ * `COMMENT_LIST_SELECTOR`). The post is the FIRST listitem. Validated live (2026 FR detail page).
+ */
+export const FEED_DETAIL_SELECTOR = '[data-testid*="FEED_DETAIL" i]';
+export const LIST_ITEM_SELECTOR = '[role="listitem"]';
+
+/**
+ * On the detail page the post's canonical URN is exposed straight in the reaction-facepile testid
+ * (`ReactionFacepileCollection-urn:li:activity:<id>` / `…ugcPost:<id>`) — the SAME activity/ugcPost URN
+ * the feed reads from React props, so the dedup key matches. (The `/posts/…-share-<id>` URL id is a
+ * DIFFERENT id space and must never be used as the key.)
+ */
+export const REACTION_FACEPILE_URN_SELECTOR =
+  '[data-testid^="ReactionFacepileCollection-urn:li:activity:"], [data-testid^="ReactionFacepileCollection-urn:li:ugcPost:"]';
+
 /** The rendered post/comment body (LinkedIn reuses this testid for both, clamped behind "see more"). */
 export const EXPANDABLE_TEXT_SELECTOR = '[data-testid="expandable-text-box"]';
 export const POST_TEXT_SELECTORS = [EXPANDABLE_TEXT_SELECTOR] as const;

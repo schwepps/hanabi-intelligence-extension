@@ -8,7 +8,7 @@ import {
   readBridgeMessage,
 } from '@/shared/window-bridge';
 import { DedupStore } from './dedup';
-import { isFeedUrl, watchFeed } from './gate';
+import { shouldCaptureUrl, watchCaptureState } from './gate';
 
 export default defineContentScript({
   // Site-wide match is intentional: LinkedIn is an SPA, so a content script injects once on
@@ -38,17 +38,20 @@ export default defineContentScript({
       }
     });
 
-    // Capture runs only when BOTH on the feed AND consent granted (default off, safe by default).
+    // Capture runs only when BOTH on a capture surface (feed or post permalink) AND consent granted
+    // (default off, safe by default).
     const evaluate = async (): Promise<void> => {
-      const shouldCapture = isFeedUrl(location.href) && (await consentGranted.getValue());
+      const shouldCapture = shouldCaptureUrl(location.href) && (await consentGranted.getValue());
       if (shouldCapture === enabled) return;
       enabled = shouldCapture;
-      logDebug(enabled ? 'capture: enabled (on feed, consent granted)' : 'capture: disabled');
+      logDebug(
+        enabled ? 'capture: enabled (feed/permalink, consent granted)' : 'capture: disabled',
+      );
       postControl(enabled);
     };
 
     void evaluate();
-    watchFeed(() => void evaluate()); // SPA route changes
+    watchCaptureState(() => void evaluate()); // SPA route changes
     consentGranted.watch(() => void evaluate()); // consent toggled live
   },
 });
