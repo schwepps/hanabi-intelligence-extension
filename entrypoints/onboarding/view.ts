@@ -1,5 +1,5 @@
 /**
- * Onboarding behaviour (FSC-111). The static copy/structure lives in `index.html`; this wires the
+ * Onboarding behaviour. The static copy/structure lives in `index.html`; this wires the
  * interactive flow: paste token → verify against the backend (show the sensor's identity) → consent →
  * record consent server-side + store the identity + flip the local consent flag → success. Deps are
  * injected (defaults = the real modules) so the flow is unit-testable against a DOM fixture.

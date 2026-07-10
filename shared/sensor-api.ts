@@ -1,5 +1,5 @@
 /**
- * Sensor identity API client (FSC-98). Talks to the backend's onboarding endpoints so the extension
+ * Sensor identity API client. Talks to the backend's onboarding endpoints so the extension
  * can (1) validate a pasted ingestion token and read back who the sensor is, and (2) record the
  * sensor's GDPR consent server-side. The raw token is sent as `Authorization: Bearer <token>`; the
  * backend hashes it (SHA-256) and matches `sensors.token_hash` — the extension never hashes.
@@ -43,7 +43,7 @@ export async function fetchSensorProfile(token: string): Promise<SensorProfile |
  * locally if the server did not record it.
  */
 export async function recordSensorConsent(token: string): Promise<string> {
-  // No request body — the sensor is identified by the bearer token alone (FSC-98). Deliberately omit
+  // No request body — the sensor is identified by the bearer token alone. Deliberately omit
   // `Content-Type: application/json`: declaring a JSON body without sending one can trip middleware
   // that tries to parse it.
   const res = await fetch(`${BASE_URL}/api/sensor/consent`, {

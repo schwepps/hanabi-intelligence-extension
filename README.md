@@ -1,4 +1,4 @@
-# Hanabi Radar — Extension
+# Hanabi Intelligence — Extension
 
 Browser extension that **passively** captures LinkedIn feed posts for the Hanabi
 collective. It only reads what a logged-in "sensor" — a collective member running the
@@ -8,8 +8,8 @@ beyond what a feed post renders.** Captured posts are forwarded to the Hanabi ba
 
 Built with [WXT](https://wxt.dev) (Manifest V3, Chromium target) in strict TypeScript.
 
-> Status: **feed capture** (FSC-110), **onboarding + consent** (FSC-111), and the **authenticated
-> send-queue** (FSC-112) are implemented against LinkedIn's 2026 Server-Driven-UI feed. Capture is
+> Status: **feed capture**, **onboarding + consent**, and the **authenticated
+> send-queue** are implemented against LinkedIn's 2026 Server-Driven-UI feed. Capture is
 > **off by default** and starts only after the sensor consents; captured posts are queued in the
 > background worker and POSTed to the ingestion API with retry/backoff and dedup.
 
@@ -76,8 +76,10 @@ a clean data model. So capture reads two surfaces of the _rendered_ feed:
   node's **React props** — it is in no DOM attribute. It extracts the other fields from the
   rendered DOM (resolved text, aria-labels, hrefs) and relays slim payloads.
 - **`entrypoints/content/index.ts` — isolated world**: owns the consent + feed-URL gate,
-  de-dupes by post id, and forwards to the background. It coordinates with the reader over a
-  `window.postMessage` bridge (`shared/window-bridge.ts`: `hello` / `control` / `capture`).
+  validates each post against the wire contract (dropping anything that would 422 the batch — e.g. a
+  post with no resolvable author), de-dupes by post id, and forwards to the background. It coordinates
+  with the reader over a `window.postMessage` bridge (`shared/window-bridge.ts`: `hello` / `control` /
+  `capture`).
 
 Everything is strictly passive: the reader only observes responses/DOM the sensor's own
 session already produced — no clicks, scrolls, or network calls to LinkedIn.
@@ -115,7 +117,7 @@ entrypoints/
     install.ts                 #   open onboarding on first install
     queue.ts                   #   durable FIFO queue (storage.local) + write mutex
     sent-ids.ts                #   persistent already-sent set (dedup across restarts)
-    send.ts                    #   authenticated batch POST + response classification
+    send.ts                    #   authenticated batch POST + outcome classification (422 → drop rejected post, retry rest)
     drain.ts                   #   drain state machine (batching, retry, opt-out abort)
     backoff.ts                 #   exponential backoff + persisted failure streak
     scheduler.ts               #   browser.alarms retry seam
@@ -132,7 +134,7 @@ entrypoints/
     dedup.ts                   # per-tab dedup by post id
     observer.ts                # debounced MutationObserver helper
     parse/                     # localized number + degree parsers
-  onboarding/                  # first-launch consent screen + sensor-token linking (FSC-111)
+  onboarding/                  # first-launch consent screen + sensor-token linking
   popup/                       # capture on/off toggle + link status
 shared/
   payload.ts                   # PostPayload + CommentSignal (capture contract SSOT)
@@ -142,7 +144,7 @@ shared/
   consent.ts                   # storage-backed consent flag (default off)
   backend.ts                   # backend origin by build mode (single source)
   messages.ts                  # typed content → background messaging
-  window-bridge.ts             # MAIN ↔ ISOLATED postMessage protocol
+  window-bridge.ts             # MAIN ↔ ISOLATED postMessage protocol + inbound capture validation
   log.ts                       # '[hanabi]' logging
 wxt.config.ts                  # manifest (permissions: ['storage', 'alarms']) + zip placeholder guard
 ```

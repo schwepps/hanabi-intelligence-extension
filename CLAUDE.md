@@ -1,22 +1,22 @@
-# CLAUDE.md — Hanabi-extension
+# CLAUDE.md — Hanabi Intelligence (Extension)
 
 > Concise by design: the linter owns style, this file owns commands, architecture, and
 > guardrails. Keep it in sync with reality; delete anything that goes stale.
 
 ## Context
 
-Hanabi Radar captures LinkedIn posts for the Hanabi collective's partners. This repo = **the
+Hanabi Intelligence captures LinkedIn posts for the Hanabi collective's partners. This repo = **the
 browser extension**: it **passively** reads the sensor's LinkedIn feed (in their
-already-logged-in session) and sends posts to the backend (separate repo `Hanabi-app`).
+already-logged-in session) and sends posts to the backend (separate repo `hanabi-intelligence`).
 
 **No automation** — we only read what the sensor already sees while scrolling → near-zero ban
 risk. The backend never talks to LinkedIn; all capture lives here.
 
 ("sensor" = a collective member who installed the extension and captures their own feed;
-matches the `sensors` table in `Hanabi-app`.)
+matches the `sensors` table in `hanabi-intelligence`.)
 
 Tickets: Linear (team FSC Consulting, label `Hanabi-extension`). The MVP spec and the payload
-contract live in `Hanabi-app` (contract = ticket FSC-98).
+contract live in `hanabi-intelligence`.
 
 ## Stack (as installed — keep in sync with `package.json`)
 
@@ -50,11 +50,12 @@ contract live in `Hanabi-app` (contract = ticket FSC-98).
   post id, forwards to the background. Injected site-wide (LinkedIn is an SPA) — gate to the feed at
   **runtime** via `window.location`, not by narrowing manifest `matches`. The fragile DOM knowledge
   is isolated in `content/feed/selectors.ts` + `feed/react-urn.ts` so a LinkedIn change is a localized fix.
-- **Background service worker** (`entrypoints/background/`, FSC-112): a durable send-queue that POSTs
+- **Background service worker** (`entrypoints/background/`): a durable send-queue that POSTs
   captured posts to the ingestion API (`POST /api/ingest`, batch envelope) authenticated with the
   sensor token, with retry/backoff and persistent dedup. `index.ts` is pure wiring; logic is split by
   responsibility — `queue.ts` (persistent FIFO + write mutex), `sent-ids.ts` (dedup), `send.ts` (batch
-  POST + response classification), `backoff.ts` / `scheduler.ts` (backoff over `browser.alarms`),
+  POST + outcome classification: 2xx forget · 422 poison-drop + retry · 413 re-chunk · transient backoff),
+  `backoff.ts` / `scheduler.ts` (backoff over `browser.alarms`),
   `drain.ts` (the state machine). Opt-out clears the queue and aborts any in-flight batch.
   - ⚠️ **MV3 workers are ephemeral.** The queue lives in `storage.local` (`storage.defineItem`), never
     in memory; an entry is removed only on a confirmed 2xx; retry is driven by `browser.alarms` /
@@ -75,10 +76,10 @@ contract live in `Hanabi-app` (contract = ticket FSC-98).
 - **Env-configurable backend** (`shared/backend.ts`, single source): the origin follows the build mode
   via `backendOrigin(import.meta.env.PROD)` — dev → local (`http://127.0.0.1:3000`), distribution →
   hosted EU — and the manifest `host_permissions` derive from the same function so they can't drift.
-  **Never hardcode the endpoint at a call site.** The hosted origin is a placeholder until FSC-107; a
-  `zip:start` guard fails `pnpm zip` on it so no distribution ships against it.
+  **Never hardcode the endpoint at a call site.** The hosted origin is a placeholder until the hosted
+  backend lands; a `zip:start` guard fails `pnpm zip` on it so no distribution ships against it.
 
-## Payload contract (source of truth in `Hanabi-app`, FSC-98 — conform strictly, invent nothing)
+## Payload contract (source of truth in `hanabi-intelligence` — conform strictly, invent nothing)
 
 Per post: `linkedin_post_id`, `text`, `url`, `author_name`, `author_company`, `author_title`,
 `author_profile_url`, `author_type`, `post_type`, `is_repost`, `original_author_name`,
@@ -89,7 +90,10 @@ The wire shape sent to `POST /api/ingest` is the batch envelope `{ version: 1, p
 `shared/ingestion.ts` projects each `PostPayload` onto the exact backend-accepted fields via an
 allowlist (`INGEST_POST_KEYS`, excludes `comments` — see below). The backend upserts idempotently on
 `linkedin_post_id`, so re-sending is safe; a 422 rejects the whole batch, so the allowlist must match
-the backend schema exactly.
+the backend schema exactly. One bad post can't stall the queue: the isolated content script rejects
+anything that would 422 before enqueue (`isValidCapturedPost` — non-blank `author_name`, in-enum values,
+LinkedIn-host URLs), and if a 422 still occurs `send.ts` maps the backend's dot-joined `issues[].path`
+back to the offending id, drops only that post, and retries the rest.
 
 - **`post_type`** (text | image | multi_image | video | document | poll | article): document/
   carousel and video posts carry their substance outside the text — without the format the
@@ -103,14 +107,14 @@ the backend schema exactly.
 - **Comments (captured, not yet transmitted):** visible preview comments are captured as `comments[]`
   (`{ author_name, author_profile_url, text }`) — a warm-intro signal (who engaged, and how). The send
   path **strips `comments` until the backend accepts it** (excluded from the wire allowlist; the queue
-  also drops them at rest — data minimization). End-to-end support is tracked in **FSC-114**; FSC-111
+  also drops them at rest — data minimization). End-to-end transmission is tracked separately; the
   consent copy already covers commenter data.
 - **Field confidence on the 2026 SDUI feed** (validated live): production-grade = `linkedin_post_id`
-  (+ derived `url`), author name/profile_url/type, `author_degree` (name badge, FSC-116), `text`,
-  `reaction_count`, `hashtags`, `social_proof`, `comments`, `posted_at_raw` (FSC-118),
-  `post_type` ∈ {video, document, article} + `media_title` (document badge, FSC-117), and repost
-  provenance (`is_repost` + `original_author_*`, FSC-115). Best-effort = `author_company`/`title`
-  (headline `chez`/`at`/`@` split, FSC-118 — FR headlines are noisy taglines, so null unless a clear
+  (+ derived `url`), author name/profile_url/type, `author_degree` (name badge), `text`,
+  `reaction_count`, `hashtags`, `social_proof`, `comments`, `posted_at_raw`,
+  `post_type` ∈ {video, document, article} + `media_title` (document badge), and repost
+  provenance (`is_repost` + `original_author_*`). Best-effort = `author_company`/`title`
+  (headline `chez`/`at`/`@` split — FR headlines are noisy taglines, so null unless a clear
   delimiter). Deferred (safe default until a durable anchor lands) = `comment_count`, and `post_type`
   image/multi_image/poll — no reliable SDUI anchor (content `<img>`s report width 0 / are background
   images; `role="radio"` is not poll-specific), and kept conservative `text` because `post_type` is
@@ -119,7 +123,7 @@ the backend schema exactly.
   list (guardrail). `social_proof` comes from the context header ("X a aimé/commenté ceci") and the
   author is taken from the actor block excluding that header, so a surfaced post attributes to the
   poster, not the surfacing connection — and `author_degree` is the poster's own, independent of it.
-- **Repost provenance** (`resolveRepost` in `feed/fields.ts`, FSC-115): the original author is captured
+- **Repost provenance** (`resolveRepost` in `feed/fields.ts`): the original author is captured
   for both reshare shapes, never the resharer — a plain reshare ("X a republié ceci") renders the
   original below the header so `author` (header excluded) already IS the original; a quote-repost
   (reshare-with-thoughts) carries the original inside an embedded card anchored on its `/feed/update/`
@@ -136,7 +140,7 @@ the backend schema exactly.
   LinkedIn renders on a feed post. Nuance: reading the degree badge ("2nd") next to an author **is**
   allowed (one enum, one visible post); **enumerating the sensor's connections is not** — never
   crawl the connections list to resolve degrees.
-- **Consent before capture** (FSC-111): first-launch screen explaining what's captured, why, and
+- **Consent before capture**: first-launch screen explaining what's captured, why, and
   opt-out; capture starts only after explicit agreement.
 - **Minimal permissions**: declared permissions are `storage` (consent, sensor identity, send-queue)
   and `alarms` (send-queue retry — the only MV3-durable wake, no user-facing warning); `host_permissions`
@@ -147,5 +151,5 @@ the backend schema exactly.
 
 - Do not automate any LinkedIn interaction, even "to go faster".
 - Do not widen manifest permissions for convenience.
-- Do not diverge from the payload contract without updating `Hanabi-app` in parallel.
+- Do not diverge from the payload contract without updating `hanabi-intelligence` in parallel.
 - Do not add a heavy UI framework — the UI is limited to onboarding/consent.

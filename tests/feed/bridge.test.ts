@@ -89,7 +89,7 @@ describe('isValidCapturedPost', () => {
     ).toBe(true);
   });
 
-  it('accepts populated enum + best-effort string fields (FSC-116/117/118)', () => {
+  it('accepts populated enum + best-effort string fields', () => {
     expect(
       isValidCapturedPost(
         stubPayload({
@@ -127,6 +127,14 @@ describe('isValidCapturedPost', () => {
     expect(isValidCapturedPost({ ...base, text: [] } as unknown)).toBe(false);
     expect(isValidCapturedPost({ ...base, social_proof: {} } as unknown)).toBe(false);
     expect(isValidCapturedPost({ ...base, captured_at: 123 } as unknown)).toBe(false);
+  });
+
+  it('rejects a null or blank author_name (backend requires a non-empty author → else it 422s the batch)', () => {
+    const base = stubPayload({ linkedin_post_id: 'urn:li:activity:3' });
+    expect(isValidCapturedPost({ ...base, author_name: null } as unknown)).toBe(false);
+    expect(isValidCapturedPost({ ...base, author_name: '' } as unknown)).toBe(false);
+    expect(isValidCapturedPost({ ...base, author_name: '   ' } as unknown)).toBe(false);
+    expect(isValidCapturedPost({ ...base, author_name: 'Ada Lovelace' })).toBe(true);
   });
 
   it('accepts a repost that names its original author', () => {

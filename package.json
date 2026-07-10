@@ -1,6 +1,6 @@
 {
-  "name": "hanabi-extension",
-  "description": "Hanabi Radar — browser extension that passively captures LinkedIn feed posts for the Hanabi collective.",
+  "name": "hanabi-intelligence-extension",
+  "description": "Hanabi Intelligence — browser extension that passively captures LinkedIn feed posts for the Hanabi collective.",
   "private": true,
   "version": "0.0.0",
   "packageManager": "pnpm@10.26.1",

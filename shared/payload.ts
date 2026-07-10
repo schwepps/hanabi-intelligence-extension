@@ -1,8 +1,8 @@
 /**
- * The post payload contract (FSC-98), single source of truth for the extension.
+ * The post payload contract, single source of truth for the extension.
  *
- * FSC-98 (`Hanabi-app` ingestion) is still unstarted and calls this payload "authoritative for the
- * extension (FSC-110)", so the concrete field-level shape is defined HERE and must be mirrored by
+ * The backend (`Hanabi-app` ingestion) treats this payload as authoritative for the
+ * extension, so the concrete field-level shape is defined HERE and must be mirrored by
  * the backend when it is built. Do not diverge without updating `Hanabi-app` in parallel.
  *
  * Routing (enforced backend-side): every field lands on `items` EXCEPT `author_degree` and
@@ -59,7 +59,7 @@ export interface PostPayload {
   social_proof: string | null;
   /**
    * Visible preview comments on the post — a warm-intro signal (who engaged, and how). Empty when
-   * none are rendered. ⚠️ CONTRACT EXTENSION beyond the original FSC-98 field list: mirror this in
+   * none are rendered. ⚠️ CONTRACT EXTENSION beyond the original backend field list: mirror this in
    * `Hanabi-app` (likely a related `item_comments` / per-sensor table) before relying on it.
    */
   comments: CommentSignal[];

@@ -23,11 +23,11 @@ export interface AssembleContext {
  * props in the MAIN world). Returns null when the URN is missing — no dedup key ⇒ skip.
  *
  * Production-confidence fields (validated against the live feed): linkedin_post_id, url,
- * author_name/profile_url/type, author_degree (name badge, FSC-116), text, reaction_count, hashtags,
- * post_type video/document/article + media_title (FSC-117), posted_at_raw (FSC-118), social_proof
+ * author_name/profile_url/type, author_degree (name badge), text, reaction_count, hashtags,
+ * post_type video/document/article + media_title, posted_at_raw, social_proof
  * (from an engagement context header), comments, and repost provenance — original author for both a
- * plain reshare and a quote-repost (`resolveRepost`, FSC-115). Best-effort: author_company/author_title
- * (headline split, FSC-118). Still deferred (safe default until a durable anchor lands): comment_count,
+ * plain reshare and a quote-repost (`resolveRepost`). Best-effort: author_company/author_title
+ * (headline split). Still deferred (safe default until a durable anchor lands): comment_count,
  * and post_type image/multi_image/poll — no reliable SDUI anchor, kept conservative `text` since a
  * mistype is permanent at ingest.
  *

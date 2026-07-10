@@ -1,5 +1,5 @@
 /**
- * One authenticated batch POST to the ingestion backend (`POST /api/ingest`, FSC-98) + classification
+ * One authenticated batch POST to the ingestion backend (`POST /api/ingest`) + classification
  * of the response into a drain action. Mirrors the auth/base-URL idiom of `shared/sensor-api.ts`
  * (`Authorization: Bearer <token>`, `BASE_URL = backendOrigin(import.meta.env.PROD)`), but unlike the
  * onboarding calls it returns a discriminated union instead of throwing: the drain must branch several
@@ -68,18 +68,36 @@ export async function submitBatch(
 }
 
 /**
- * A 422 rejects the whole batch on the first schema violation. Map each `issues[].path` (`['posts',
- * <index>, <field>]`) back to a `linkedin_post_id` and drop exactly those. If no post index is present
- * (an envelope-level error, e.g. a bad `version`), our request itself is malformed — halt rather than
- * drop good data or loop forever on an unchanged batch.
+ * A 422 rejects the whole batch on the first schema violation. Map each `issues[].path` back to a
+ * `linkedin_post_id` and drop exactly those. If no post index is present (an envelope-level error,
+ * e.g. a bad `version`), our request itself is malformed — halt rather than drop good data or loop
+ * forever on an unchanged batch.
  */
 async function classifyPoison(res: Response, posts: PostPayload[]): Promise<SubmitOutcome> {
   const body = (await res.json().catch(() => null)) as IngestErrorBody | null;
   const issues = Array.isArray(body?.error?.issues) ? body.error.issues : [];
   const dropIds = new Set<string>();
   for (const issue of issues) {
-    const index = issue.path?.[1];
-    if (typeof index === 'number' && posts[index]) dropIds.add(posts[index].linkedin_post_id);
+    const index = postIndexFromPath(issue.path);
+    if (index !== null && posts[index]) dropIds.add(posts[index].linkedin_post_id);
   }
   return dropIds.size === 0 ? { kind: 'halt' } : { kind: 'poison', dropIds: [...dropIds] };
+}
+
+// A post-level issue path is "posts.<index>.<field>" (dot-joined by the backend). Anchor on the
+// `posts.` prefix and capture the digit run so only a real post index matches — never an
+// envelope-level path ("version"), a non-post path ("comments.1.text"), or a malformed one
+// ("posts..field", where a bare Number('') would otherwise coerce to 0 and drop post 0).
+const POST_PATH_INDEX_RE = /^posts\.(\d+)(?:\.|$)/;
+
+/**
+ * Extract the batch post index from an issue path. The backend serializes `issue.path` as a
+ * dot-joined STRING — `"posts.<index>.<field>"` (hanabi-intelligence `route.ts`: `path.map(String).join('.')`);
+ * anything without a `posts.<digits>` prefix (an envelope error, a non-post path, a malformed one, or a
+ * non-string proxy body) yields null, so the caller halts rather than dropping a good post.
+ */
+function postIndexFromPath(path: unknown): number | null {
+  if (typeof path !== 'string') return null;
+  const match = POST_PATH_INDEX_RE.exec(path);
+  return match ? Number(match[1]) : null;
 }

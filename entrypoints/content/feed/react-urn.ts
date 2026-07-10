@@ -10,8 +10,22 @@
  * repost the outer feed-item URN and the original's URN can both be present; disambiguating the
  * outer one is a known follow-up.
  */
+import { REACTION_FACEPILE_URN_SELECTOR } from './selectors';
+
 const POST_URN_RE = /urn:li:(?:activity|ugcPost):\d+/;
 const MAX_NODES = 20_000;
+
+/**
+ * Read the post's canonical URN from a permalink detail page's reaction-facepile testid
+ * (`ReactionFacepileCollection-urn:li:activity:<id>`) — a stable DOM anchor, no React walk. Returns
+ * the SAME activity/ugcPost URN the feed reads from props, so the dedup key matches a feed capture of
+ * the same post. Null when no facepile is rendered (e.g. a 0-reaction post); the caller then falls
+ * back to `extractActivityUrn`. The `/posts/…-share-<id>` URL id is a DIFFERENT id space — never used.
+ */
+export function urnFromReactionFacepile(scope: ParentNode): string | null {
+  const el = scope.querySelector(REACTION_FACEPILE_URN_SELECTOR);
+  return el?.getAttribute('data-testid')?.match(POST_URN_RE)?.[0] ?? null;
+}
 
 export function extractActivityUrn(el: Element): string | null {
   const seen = new WeakSet<object>();

@@ -10,6 +10,9 @@ node_modules
 # WXT bundle analysis
 stats.html
 
+# Playwright MCP scratch output (snapshots, console/network logs)
+.playwright-mcp/
+
 # Local / editor
 *.local
 .DS_Store

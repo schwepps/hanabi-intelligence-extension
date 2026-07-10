@@ -43,8 +43,7 @@ body {
 .hb-brand-mark {
   width: 26px;
   height: 26px;
-  border-radius: 7px;
-  background-image: var(--hb-gradient-brand-mark);
+  display: block;
 }
 
 .hb-brand-word {

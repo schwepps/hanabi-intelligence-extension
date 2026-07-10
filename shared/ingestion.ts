@@ -1,6 +1,6 @@
 /**
- * The ingestion wire contract — mirrors the backend's `POST /api/ingest` (FSC-98,
- * `hanabi-radar`). Isolated from `shared/payload.ts` (the extension's INTERNAL capture shape) because
+ * The ingestion wire contract — mirrors the backend's `POST /api/ingest`
+ * (`hanabi-intelligence`). Isolated from `shared/payload.ts` (the extension's INTERNAL capture shape) because
  * the wire shape is the backend's, not ours: the backend validates each post with `z.strictObject`,
  * so ANY key it doesn't know — `comments`, or a future `PostPayload` addition — rejects the whole
  * batch with 422. `toIngestPost` is an explicit allowlist so that can never happen by accident.
@@ -21,7 +21,7 @@ export const MAX_BATCH_BYTES = 512 * 1024;
 
 /**
  * The exact field set the backend `postSchema` accepts. Keep in lockstep with it. `comments` is
- * deliberately EXCLUDED until FSC-114 adds backend support (the extension captures it but must not
+ * deliberately EXCLUDED until the backend accepts it (the extension captures it but must not
  * send it — see `toIngestPost`).
  */
 export const INGEST_POST_KEYS = [
@@ -64,12 +64,13 @@ export interface IngestSuccessBody {
   failed?: { linkedin_post_id: string; error: string }[];
 }
 
-/** Uniform error body for every non-2xx. `issues` is present on a 422 schema rejection. */
+/** Uniform error body for every non-2xx. `issues` is present on a 422 schema rejection. The backend
+ * serializes each issue `path` as a dot-joined string, e.g. `"posts.1.author_name"` (NOT an array). */
 export interface IngestErrorBody {
   error: {
     code: string;
     message: string;
-    issues?: { path: (string | number)[]; message: string }[];
+    issues?: { path: string; message: string }[];
   };
 }
 

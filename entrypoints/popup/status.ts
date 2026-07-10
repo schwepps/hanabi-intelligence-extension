@@ -1,5 +1,5 @@
 /**
- * Pure popup view-model (FSC-111). Maps the two persisted facts — consent flag + linked identity —
+ * Pure popup view-model. Maps the two persisted facts — consent flag + linked identity —
  * to what the toolbar popup shows and which action its button takes. Kept pure so the state logic is
  * unit-tested without a DOM.
  */

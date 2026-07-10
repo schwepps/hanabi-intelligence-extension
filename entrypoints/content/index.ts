@@ -8,13 +8,13 @@ import {
   readBridgeMessage,
 } from '@/shared/window-bridge';
 import { DedupStore } from './dedup';
-import { isFeedUrl, watchFeed } from './gate';
+import { shouldCaptureUrl, watchCaptureState } from './gate';
 
 export default defineContentScript({
   // Site-wide match is intentional: LinkedIn is an SPA, so a content script injects once on
-  // document load and persists across client-side navigation. Feed-only scoping is enforced at
-  // RUNTIME (the isFeedUrl gate) together with consent — we never read messaging, notifications
-  // or the connection graph.
+  // document load and persists across client-side navigation. Capture scoping is enforced at
+  // RUNTIME (the shouldCaptureUrl gate — the home feed or a post permalink) together with consent —
+  // we never read messaging, notifications, profiles, or the connection graph.
   matches: ['https://www.linkedin.com/*'],
   main() {
     // The MAIN-world reader (feed-reader.ts) extracts posts (it can read React props for the URN);
@@ -38,17 +38,20 @@ export default defineContentScript({
       }
     });
 
-    // Capture runs only when BOTH on the feed AND consent granted (default off, safe by default).
+    // Capture runs only when BOTH on a capture surface (feed or post permalink) AND consent granted
+    // (default off, safe by default).
     const evaluate = async (): Promise<void> => {
-      const shouldCapture = isFeedUrl(location.href) && (await consentGranted.getValue());
+      const shouldCapture = shouldCaptureUrl(location.href) && (await consentGranted.getValue());
       if (shouldCapture === enabled) return;
       enabled = shouldCapture;
-      logDebug(enabled ? 'capture: enabled (on feed, consent granted)' : 'capture: disabled');
+      logDebug(
+        enabled ? 'capture: enabled (feed/permalink, consent granted)' : 'capture: disabled',
+      );
       postControl(enabled);
     };
 
     void evaluate();
-    watchFeed(() => void evaluate()); // SPA route changes
-    consentGranted.watch(() => void evaluate()); // consent toggled live (FSC-111)
+    watchCaptureState(() => void evaluate()); // SPA route changes
+    consentGranted.watch(() => void evaluate()); // consent toggled live
   },
 });
