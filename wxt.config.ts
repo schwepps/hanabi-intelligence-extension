@@ -3,6 +3,12 @@ import { backendOrigin, HOSTED_BACKEND_ORIGIN } from './shared/backend';
 
 // See https://wxt.dev/api/config.html
 export default defineConfig({
+  // Pin the dev server off 3000: `next dev` (the radar backend) owns 3000, which the extension
+  // calls as its backend origin (shared/backend.ts). Both `wxt dev` and `next dev` default to
+  // 3000, so without this the two race for the port and the extension hits the wrong server.
+  dev: {
+    server: { port: 3001 },
+  },
   // `manifest` is a function of the build env so `host_permissions` follows the build MODE — dev
   // (`pnpm dev`, mode 'development') → local backend, distribution (`build`/`zip`, mode 'production')
   // → hosted. Keyed on `mode` (NOT `command`) to match the runtime base URL in shared/sensor-api.ts:
