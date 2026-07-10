@@ -76,6 +76,49 @@ describe('assemblePost', () => {
     });
   });
 
+  it('populates author_degree from the rendered name badge and cleans the name', () => {
+    const post = fragment(`
+      <div>
+        <a href="https://www.linkedin.com/in/victor/" aria-label="Victor"><img alt="" /></a>
+        <a href="https://www.linkedin.com/in/victor/"><span>Victor Taki</span><span> • 2e</span></a>
+        <div data-testid="expandable-text-box">hi</div>
+      </div>`);
+    expect(assemblePost(post, 'urn:li:activity:20', ctx)).toMatchObject({
+      author_name: 'Victor Taki',
+      author_degree: 'second',
+    });
+  });
+
+  it('populates posted_at_raw and author company/title from the actor block', () => {
+    const post = fragment(`
+      <div>
+        <div>
+          <a href="https://www.linkedin.com/in/ada/"><span>Ada Lovelace</span></a>
+          <span>Founder at Globex</span>
+          <span>16 h •</span>
+        </div>
+        <div data-testid="expandable-text-box">hi</div>
+      </div>`);
+    expect(assemblePost(post, 'urn:li:activity:21', ctx)).toMatchObject({
+      posted_at_raw: '16 h',
+      author_company: 'Globex',
+      author_title: 'Founder',
+    });
+  });
+
+  it('classifies a document post and captures its media_title', () => {
+    const post = fragment(`
+      <div>
+        <a href="https://www.linkedin.com/in/colin/"><span>Colin Dargent</span></a>
+        <button aria-label="Aller à la page suivante du document"></button>
+        <div><span>n8n et Claude</span><span>·</span><span>8 pages</span></div>
+      </div>`);
+    expect(assemblePost(post, 'urn:li:activity:22', ctx)).toMatchObject({
+      post_type: 'document',
+      media_title: 'n8n et Claude',
+    });
+  });
+
   it('populates the original author on a plain reshare', () => {
     const reshare = fragment(`
       <div>

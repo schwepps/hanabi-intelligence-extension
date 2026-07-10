@@ -1,16 +1,22 @@
 import { isLinkedInHost } from '@/shared/linkedin-url';
-import type { AuthorType, CommentSignal, PostType } from '@/shared/payload';
+import type { AuthorDegree, AuthorType, CommentSignal, PostType } from '@/shared/payload';
 import { cleanText, queryAll, queryFirst, queryText } from '../dom';
+import { parseAuthorDegree } from '../parse/degree';
 import { parseLocalizedCount } from '../parse/number';
 import {
+  ARTICLE_LINK_SELECTOR,
   AUTHOR_LINK_SELECTORS,
   COMMENT_COUNT_PATTERN,
   COMMENT_LIST_SELECTOR,
+  DOCUMENT_SELECTOR,
   ENGAGEMENT_SURFACE_PATTERN,
   EXPANDABLE_TEXT_SELECTOR,
   HASHTAG_SELECTORS,
+  HEADLINE_SPLIT_PATTERN,
+  MEDIA_PAGES_PATTERN,
   PERSON_LINK_SELECTOR,
   POST_TEXT_SELECTORS,
+  POSTED_AT_PATTERN,
   REACTION_COUNT_PATTERN,
   REPOST_SURFACE_PATTERN,
   RESHARED_UPDATE_LINK_SELECTOR,
@@ -26,6 +32,8 @@ export interface AuthorInfo {
   name: string | null;
   profile_url: string | null;
   type: AuthorType;
+  /** Author's connection degree to the sensor, read from the rendered name badge (FSC-116). */
+  degree: AuthorDegree;
 }
 
 /**
@@ -33,24 +41,46 @@ export interface AuthorInfo {
  * name link (text) both pointing at the profile; we take the first link WITH text as the name,
  * and its href as the profile URL. `/company/` → company, else person.
  *
+ * The degree badge renders as a suffix INSIDE the name link's text ("Victor Taki • 2e"), so we
+ * parse the degree from that raw text and then strip the badge off the name (`shortName`) — else
+ * `author_name` leaks "• 2e" / "• Suivi" (FSC-116). Reads only the rendered badge; the connection
+ * list is never enumerated (guardrail).
+ *
  * Links inside `excludeHeader` (a social-proof context header) and inside embedded comment threads
- * are skipped, so on a surfaced post the author is the real poster — not the surfacing connection
- * (whose link comes first) or a commenter.
+ * are skipped, so on a surfaced post the author — AND its degree — is the real poster, not the
+ * surfacing connection (whose link comes first) or a commenter.
  */
 export function extractAuthor(post: Element, excludeHeader?: Element | null): AuthorInfo {
-  const links = queryAll(post, AUTHOR_LINK_SELECTORS).filter(
-    (a) => !a.closest(COMMENT_LIST_SELECTOR) && !(excludeHeader && excludeHeader.contains(a)),
-  );
-  const nameLink = links.find((a) => cleanText(a.textContent) !== null) ?? null;
-  const link = nameLink ?? links[0] ?? null;
+  const { nameLink, link } = resolveActor(post, excludeHeader);
 
   const profile_url = normalizeProfileUrl(link?.getAttribute('href'));
   // Organizations (company + school Pages) are 'company'; only /in/ members are 'person'.
   const type: AuthorType =
     profile_url != null && /\/(?:company|school)\//.test(profile_url) ? 'company' : 'person';
-  const name = cleanText(nameLink?.textContent) ?? cleanText(link?.getAttribute('aria-label'));
+  const rawName = cleanText(nameLink?.textContent) ?? cleanText(link?.getAttribute('aria-label'));
+  const name = shortName(rawName);
+  // Only members have a connection degree; a company/school Page has none — and its name could
+  // otherwise false-match the ordinal regex (e.g. "2nd Street" → 'second').
+  const degree = type === 'person' ? parseAuthorDegree(rawName) : 'none';
 
-  return { name, profile_url, type };
+  return { name, profile_url, type, degree };
+}
+
+/**
+ * Resolve the author's actor link: the candidate profile links (excluding the surface header and
+ * comment threads), the first text-bearing one as `nameLink`, and `link` as the resolved actor
+ * (name link, else the first candidate). Shared by `extractAuthor` (name/degree/type) and
+ * `authorContainer` (company/title scope) so both always describe the SAME actor.
+ */
+function resolveActor(
+  post: Element,
+  excludeHeader?: Element | null,
+): { nameLink: Element | null; link: Element | null } {
+  const links = queryAll(post, AUTHOR_LINK_SELECTORS).filter(
+    (a) => !a.closest(COMMENT_LIST_SELECTOR) && !(excludeHeader && excludeHeader.contains(a)),
+  );
+  const nameLink = links.find((a) => cleanText(a.textContent) !== null) ?? null;
+  return { nameLink, link: nameLink ?? links[0] ?? null };
 }
 
 export interface SurfaceHeader {
@@ -237,15 +267,121 @@ export function extractCounts(post: Element): Counts {
 }
 
 /**
- * post_type. `<video>` is the one reliable structural marker on the SDUI feed, so we detect video
- * and default everything else to `text`. Distinguishing image / multi_image / document / poll /
- * article needs a content-media container anchor that isn't confirmed yet — counting `<img>`s
- * over-reports multi_image (avatars, face-piles, entity thumbnails), and a wrong media type misleads
- * the classifier more than a conservative `text`. Richer media typing is a tracked follow-up.
+ * The post's own relative timestamp ("16 h", "3 j"), verbatim — the backend derives the date. Scans
+ * short leaf nodes in DOM order (the actor timestamp precedes the body and any quote-repost inner
+ * card), skipping comment threads AND the post body — the actor timestamp lives in the actor block,
+ * never inside the body box, so excluding the body keeps a bare timestamp-like token in the text
+ * ("2h", "now") from being misread as the posted-at. Accepts only a leaf that is JUST the timestamp
+ * (+ separators / "Modifié"), so a headline that starts with a number ("5 ans …") is never mistaken
+ * for one. Null when not rendered.
+ */
+export function extractPostedAt(post: Element): string | null {
+  for (const node of post.querySelectorAll('span, a, button, time')) {
+    if (
+      node.childElementCount > 2 ||
+      node.closest(COMMENT_LIST_SELECTOR) ||
+      node.closest(EXPANDABLE_TEXT_SELECTOR)
+    )
+      continue;
+    const text = cleanText(node.textContent);
+    if (!text || text.length > 40) continue;
+    const match = POSTED_AT_PATTERN.exec(text);
+    if (!match) continue;
+    // Only the timestamp itself (edited marker + separators aside) — else it's a numeric headline.
+    const rest = text
+      .slice(match[0].length)
+      .replace(/modifi[ée]e?|edited/gi, '')
+      .replace(/[\s·•|]+/g, '');
+    if (rest === '') return cleanText(match[1]);
+  }
+  return null;
+}
+
+export interface AuthorHeadline {
+  company: string | null;
+  title: string | null;
+}
+
+/** The bounded actor block around the author name link (climbs up, but never swallows the body). */
+function authorContainer(post: Element, excludeHeader?: Element | null): Element | null {
+  const { link } = resolveActor(post, excludeHeader);
+  if (!link) return null;
+  let node: Element = link;
+  for (let i = 0; i < 5 && node.parentElement && node.parentElement !== post; i++) {
+    if (node.parentElement.querySelector(EXPANDABLE_TEXT_SELECTOR)) break; // don't swallow the body
+    node = node.parentElement;
+  }
+  return node;
+}
+
+/**
+ * Best-effort author company/title from the headline subtitle (FSC-118). Scans the actor block only
+ * (never the body), and splits the FIRST leaf whose first `|`/`·`/`•` segment matches "X chez/at/@ Y"
+ * — else both null. FR headlines are noisy free-text taglines, so we never guess a company from one.
+ */
+export function extractAuthorHeadline(
+  post: Element,
+  excludeHeader?: Element | null,
+): AuthorHeadline {
+  const container = authorContainer(post, excludeHeader);
+  if (!container) return { company: null, title: null };
+  for (const el of container.querySelectorAll('span, p, div')) {
+    if (el.childElementCount > 0 || el.closest(COMMENT_LIST_SELECTOR)) continue;
+    if (el.closest(EXPANDABLE_TEXT_SELECTOR) || (excludeHeader && excludeHeader.contains(el)))
+      continue;
+    const text = cleanText(el.textContent);
+    if (!text || text.length > 120) continue;
+    const segment = cleanText(text.split(/[·•|]/)[0]);
+    const match = segment ? HEADLINE_SPLIT_PATTERN.exec(segment) : null;
+    if (!match) continue;
+    const title = cleanText(match[1] ?? match[3]);
+    const company = cleanText(match[2] ?? match[4]);
+    if (title && company) return { company: company.slice(0, 100), title: title.slice(0, 100) };
+  }
+  return { company: null, title: null };
+}
+
+/**
+ * post_type — CONSERVATIVE by design: a wrong type is permanent at ingest (first-capture-wins), so
+ * strictly worse than `text`. We only emit a non-text format on a recon-validated, high-confidence
+ * structural anchor, most-specific first: `video` (<video>), `document` (page-nav control), `article`
+ * (a standalone `/pulse/` card, not a body link). Everything else — image, multi_image, poll,
+ * external-link shares — falls to `text`: on the live SDUI feed content `<img>`s report width 0 / are
+ * background images (no reliable image anchor; avatars/face-piles over-report multi_image), and
+ * `role="radio"` is NOT poll-specific (it fires on unrelated posts). Those stay a tracked follow-up.
  */
 export function classifyPostType(post: Element): PostType {
   if (post.querySelector(VIDEO_SELECTORS.join(','))) return 'video';
+  if (post.querySelector(DOCUMENT_SELECTOR)) return 'document';
+  if (isArticleShare(post)) return 'article';
   return 'text';
+}
+
+/** A standalone `/pulse/` article card (a `/pulse/` link outside the body text / comments). */
+function isArticleShare(post: Element): boolean {
+  return [...post.querySelectorAll(ARTICLE_LINK_SELECTOR)].some(
+    (link) => !link.closest(EXPANDABLE_TEXT_SELECTOR) && !link.closest(COMMENT_LIST_SELECTOR),
+  );
+}
+
+/**
+ * The document/carousel title from its "<title> · N pages" badge (FSC-117), gated on `document` — the
+ * only classified type with a clean title, so we never grab an arbitrary heading off a `text` post.
+ * Best-effort: the badge's containing element ends with the localized "N pages" tail, and we keep the
+ * title before it. Null otherwise — article-card titles are too noisy to extract cleanly, and
+ * multi_image is not yet classified, so both stay null until a durable anchor lands.
+ */
+export function extractMediaTitle(post: Element, type: PostType): string | null {
+  if (type !== 'document') return null;
+  for (const el of post.querySelectorAll('span, div, p')) {
+    if (el.childElementCount > 6 || el.closest(COMMENT_LIST_SELECTOR)) continue;
+    if (el.closest(EXPANDABLE_TEXT_SELECTOR)) continue;
+    const text = cleanText(el.textContent);
+    if (!text || text.length > 120) continue;
+    const title = cleanText(MEDIA_PAGES_PATTERN.exec(text)?.[1]);
+    if (title) return title.slice(0, 200);
+  }
+  return null;
 }
 
 /** Visible hashtags, `#`-stripped and de-duplicated (from the stable `/hashtag/` href). */

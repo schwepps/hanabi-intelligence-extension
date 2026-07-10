@@ -85,14 +85,22 @@ session already produced — no clicks, scrolls, or network calls to LinkedIn.
 ### Field coverage (validated against the live feed)
 
 **Production-grade:** `linkedin_post_id` (+ derived `url`), `author_name`,
-`author_profile_url`, `author_type`, `text`, `reaction_count`, `hashtags`, `social_proof`
-(the connection who surfaced the post), `comments[]` (commenter + text), and repost
-provenance (`is_repost` + `original_author_*` — the reshared post's original author, never
-the resharer). `post_type` reliably detects `video`.
+`author_profile_url`, `author_type`, `author_degree` (the connection-degree badge on the
+name, e.g. "• 2e" — read only from the rendered post, never the connection list),
+`posted_at_raw` (the relative "2h"/"1d" timestamp, verbatim), `text`, `reaction_count`,
+`hashtags`, `social_proof` (the connection who surfaced the post), `comments[]` (commenter +
+text), and repost provenance (`is_repost` + `original_author_*` — the reshared post's
+original author, never the resharer). `post_type` reliably detects `video`, `document`
+(page-nav control) and `article` (native `/pulse/` card), with `media_title` from the
+document badge.
 
-**Best-effort / tracked follow-ups** (default until a durable SDUI anchor is found):
-`comment_count`, `author_degree`, `posted_at_raw`, `author_company` / `author_title`,
-`media_title`, and `image` / `multi_image` / `document` / `poll` / `article` `post_type`.
+**Best-effort:** `author_company` / `author_title`, split from the author headline only on a
+clear `chez` / `at` / `@` delimiter (else null — headlines are noisy taglines).
+
+**Deferred** (safe default until a durable SDUI anchor is found): `comment_count`, and
+`post_type` `image` / `multi_image` / `poll` — content images render with no reliable anchor
+and `role="radio"` is not poll-specific, so these stay conservative `text` (a `post_type` is
+**immutable at ingest**, so a mistype would be permanent).
 
 The selector/anchor conventions live in `entrypoints/content/feed/selectors.ts`; the fragile
 DOM knowledge is isolated there and in `feed/react-urn.ts` so a LinkedIn change is a

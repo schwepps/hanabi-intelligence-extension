@@ -3,9 +3,12 @@ import { describe, expect, it } from 'vitest';
 import {
   classifyPostType,
   extractAuthor,
+  extractAuthorHeadline,
   extractComments,
   extractCounts,
   extractHashtags,
+  extractMediaTitle,
+  extractPostedAt,
   extractText,
   findResharedCard,
   findSurfaceHeader,
@@ -29,7 +32,43 @@ describe('extractAuthor', () => {
       name: 'Ada Lovelace',
       profile_url: 'https://www.linkedin.com/in/ada-lovelace/',
       type: 'person',
+      degree: 'none',
     });
+  });
+
+  it('reads the connection degree from the name badge and strips it from the name', () => {
+    // On the live feed the degree renders as a span INSIDE the name link ("Victor Taki • 2e").
+    const post = fragment(
+      '<div><a href="https://www.linkedin.com/in/victor/" aria-label="Victor"><img alt="" /></a><a href="https://www.linkedin.com/in/victor/"><span>Victor Taki</span><span> • 2e</span></a></div>',
+    );
+    expect(extractAuthor(post)).toEqual({
+      name: 'Victor Taki',
+      profile_url: 'https://www.linkedin.com/in/victor/',
+      type: 'person',
+      degree: 'second',
+    });
+  });
+
+  it('treats a "Suivi" (Following) suffix as no degree and still cleans the name', () => {
+    const post = fragment(
+      '<div><a href="https://www.linkedin.com/in/ola/"><span>Olawale Kolawole</span><span> • Suivi</span></a></div>',
+    );
+    expect(extractAuthor(post)).toMatchObject({ name: 'Olawale Kolawole', degree: 'none' });
+  });
+
+  it('has no degree for a company page author', () => {
+    const post = fragment(
+      `<div>${authorBlock('https://www.linkedin.com/company/globex/', 'Globex')}</div>`,
+    );
+    expect(extractAuthor(post).degree).toBe('none');
+  });
+
+  it('never derives a degree for a company whose name starts with an ordinal', () => {
+    // "2nd Street" would match the degree regex, but a company Page has no connection degree.
+    const post = fragment(
+      '<div><a href="https://www.linkedin.com/company/2nd-street/"><span>2nd Street</span></a></div>',
+    );
+    expect(extractAuthor(post)).toMatchObject({ type: 'company', degree: 'none' });
   });
 
   it('classifies a company page author and strips tracking query', () => {
@@ -97,13 +136,130 @@ describe('extractCounts', () => {
   });
 });
 
+describe('extractPostedAt', () => {
+  it('reads the relative timestamp, stripping the trailing bullet', () => {
+    expect(extractPostedAt(fragment('<div><span>16 h •</span></div>'))).toBe('16 h');
+    expect(extractPostedAt(fragment('<div><span>15 min •</span></div>'))).toBe('15 min');
+    expect(extractPostedAt(fragment('<div><span>3 j</span></div>'))).toBe('3 j');
+  });
+  it('keeps an edited post’s time and drops the "Modifié" marker', () => {
+    expect(extractPostedAt(fragment('<div><span>5 h • Modifié</span></div>'))).toBe('5 h');
+  });
+  it('reads English compact times', () => {
+    expect(extractPostedAt(fragment('<div><span>2h</span></div>'))).toBe('2h');
+    expect(extractPostedAt(fragment('<div><span>3d</span></div>'))).toBe('3d');
+  });
+  it('does not mistake a headline that starts with a number for a timestamp', () => {
+    expect(
+      extractPostedAt(fragment('<div><span>5 ans d’expérience en IA</span></div>')),
+    ).toBeNull();
+  });
+  it('ignores timestamps inside comment threads', () => {
+    const post = fragment('<div><div data-testid="commentList-x"><span>2 h</span></div></div>');
+    expect(extractPostedAt(post)).toBeNull();
+  });
+  it('ignores a timestamp-like token inside the post body', () => {
+    const post = fragment(
+      '<div><div data-testid="expandable-text-box"><span>2h</span></div></div>',
+    );
+    expect(extractPostedAt(post)).toBeNull();
+  });
+  it('returns null when no timestamp is present', () => {
+    expect(extractPostedAt(fragment('<div><span>Lead AI Architect</span></div>'))).toBeNull();
+  });
+});
+
+/** A post whose actor block (name/headline/time) is nested above the body — the live 2026 shape. */
+const actorPost = (name: string, headline: string, time = '16 h •') =>
+  fragment(`
+    <div>
+      <div>
+        <a href="https://www.linkedin.com/in/x/"><span>${name}</span></a>
+        <span>${headline}</span>
+        <span>${time}</span>
+      </div>
+      <div data-testid="expandable-text-box">building great things at scale every day</div>
+    </div>`);
+
+describe('extractAuthorHeadline', () => {
+  it('splits "Title at Company"', () => {
+    expect(extractAuthorHeadline(actorPost('Ada', 'Founder at Globex'))).toEqual({
+      title: 'Founder',
+      company: 'Globex',
+    });
+  });
+  it('splits French "Titre chez Société"', () => {
+    expect(extractAuthorHeadline(actorPost('Ada', 'Directrice chez Renault'))).toEqual({
+      title: 'Directrice',
+      company: 'Renault',
+    });
+  });
+  it('splits "Role @ Company"', () => {
+    expect(extractAuthorHeadline(actorPost('Ada', 'CEO @ Acme'))).toEqual({
+      title: 'CEO',
+      company: 'Acme',
+    });
+  });
+  it('uses only the first headline segment (drops trailing | tagline noise)', () => {
+    expect(
+      extractAuthorHeadline(actorPost('Ada', 'Founder at ThirstySprout | ChoppingBlock.ai | AI')),
+    ).toEqual({ title: 'Founder', company: 'ThirstySprout' });
+  });
+  it('returns nulls for a headline with no company delimiter, and never reads the post body', () => {
+    // body contains "at scale" but must be ignored (out of the actor block)
+    expect(extractAuthorHeadline(actorPost('Ada', 'Lead AI Architect'))).toEqual({
+      title: null,
+      company: null,
+    });
+  });
+});
+
 describe('classifyPostType', () => {
   it('detects video (the one reliable structural marker)', () => {
     expect(classifyPostType(fragment('<div><video></video></div>'))).toBe('video');
   });
-  it('conservatively returns text for non-video (image typing is a documented gap)', () => {
+  it('detects a document post via the page-navigation control', () => {
+    const post = fragment(
+      '<div><button aria-label="Aller à la page suivante du document"></button><button aria-label="Page 1 sur 8"></button></div>',
+    );
+    expect(classifyPostType(post)).toBe('document');
+  });
+  it('detects a shared native article via a standalone /pulse/ card link', () => {
+    const post = fragment(
+      '<div><a href="https://www.linkedin.com/pulse/foo/"><span>Article card</span></a><div data-testid="expandable-text-box">body</div></div>',
+    );
+    expect(classifyPostType(post)).toBe('article');
+  });
+  it('does NOT treat a /pulse/ link inside the body text as an article share', () => {
+    const post = fragment(
+      '<div><div data-testid="expandable-text-box">read <a href="https://www.linkedin.com/pulse/foo/">my article</a></div></div>',
+    );
+    expect(classifyPostType(post)).toBe('text');
+  });
+  it('conservatively returns text for images/carousels (permanent-mistype risk; no reliable anchor)', () => {
     expect(classifyPostType(fragment('<div><img alt="c1" /><img alt="c2" /></div>'))).toBe('text');
     expect(classifyPostType(fragment('<div><p>hello</p></div>'))).toBe('text');
+  });
+  it('does not treat role=radio as a poll (it is noise across unrelated posts on the live feed)', () => {
+    const post = fragment('<div><div role="radio"></div><div role="radio"></div></div>');
+    expect(classifyPostType(post)).toBe('text');
+  });
+});
+
+describe('extractMediaTitle', () => {
+  it('reads the document title from the "title · N pages" badge', () => {
+    const post = fragment(
+      '<div><div><span>n8n et Claude</span><span>·</span><span>8 pages</span></div></div>',
+    );
+    expect(extractMediaTitle(post, 'document')).toBe('n8n et Claude');
+  });
+  it('returns null for a text post even if a "N pages" string appears elsewhere', () => {
+    expect(
+      extractMediaTitle(fragment('<div><span>whatever · 8 pages</span></div>'), 'text'),
+    ).toBeNull();
+  });
+  it('returns null when no document title badge is present', () => {
+    expect(extractMediaTitle(fragment('<div><span>hello</span></div>'), 'document')).toBeNull();
   });
 });
 

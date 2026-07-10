@@ -89,6 +89,46 @@ describe('isValidCapturedPost', () => {
     ).toBe(true);
   });
 
+  it('accepts populated enum + best-effort string fields (FSC-116/117/118)', () => {
+    expect(
+      isValidCapturedPost(
+        stubPayload({
+          linkedin_post_id: 'urn:li:activity:7',
+          author_type: 'company',
+          post_type: 'document',
+          author_degree: 'second',
+          author_company: 'Globex',
+          author_title: 'Founder',
+          media_title: 'n8n et Claude',
+          posted_at_raw: '16 h',
+        }),
+      ),
+    ).toBe(true);
+  });
+
+  it('rejects an out-of-enum author_type / post_type / author_degree', () => {
+    const base = stubPayload({ linkedin_post_id: 'urn:li:activity:1' });
+    expect(isValidCapturedPost({ ...base, author_type: 'robot' } as unknown)).toBe(false);
+    expect(isValidCapturedPost({ ...base, post_type: 'gif' } as unknown)).toBe(false);
+    expect(isValidCapturedPost({ ...base, author_degree: 'fourth' } as unknown)).toBe(false);
+  });
+
+  it('rejects a non-string best-effort field (would 422 the batch)', () => {
+    const base = stubPayload({ linkedin_post_id: 'urn:li:activity:1' });
+    expect(isValidCapturedPost({ ...base, author_company: 123 } as unknown)).toBe(false);
+    expect(isValidCapturedPost({ ...base, author_title: [] } as unknown)).toBe(false);
+    expect(isValidCapturedPost({ ...base, media_title: 5 } as unknown)).toBe(false);
+    expect(isValidCapturedPost({ ...base, posted_at_raw: {} } as unknown)).toBe(false);
+  });
+
+  it('rejects a non-string core wire string (author_name / text / social_proof / captured_at)', () => {
+    const base = stubPayload({ linkedin_post_id: 'urn:li:activity:2' });
+    expect(isValidCapturedPost({ ...base, author_name: 42 } as unknown)).toBe(false);
+    expect(isValidCapturedPost({ ...base, text: [] } as unknown)).toBe(false);
+    expect(isValidCapturedPost({ ...base, social_proof: {} } as unknown)).toBe(false);
+    expect(isValidCapturedPost({ ...base, captured_at: 123 } as unknown)).toBe(false);
+  });
+
   it('accepts a repost that names its original author', () => {
     expect(
       isValidCapturedPost(
