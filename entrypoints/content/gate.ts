@@ -34,11 +34,6 @@ export function pageKind(url: string | URL): PageKind {
   }
 }
 
-/** True when a full URL points at the LinkedIn home feed. */
-export function isFeedUrl(url: string | URL): boolean {
-  return pageKind(url) === 'feed';
-}
-
 /** True when capture should run on this URL (home feed OR a post permalink). */
 export function shouldCaptureUrl(url: string | URL): boolean {
   return pageKind(url) !== null;

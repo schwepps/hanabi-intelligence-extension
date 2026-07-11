@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   isFeedPath,
-  isFeedUrl,
   isPostPermalinkPath,
   pageKind,
   shouldCaptureUrl,
@@ -21,21 +20,6 @@ describe('isFeedPath', () => {
     ['/', false],
   ] as const)('isFeedPath(%s) → %s', (path, expected) => {
     expect(isFeedPath(path)).toBe(expected);
-  });
-});
-
-describe('isFeedUrl', () => {
-  it('accepts the home feed on linkedin.com and www.linkedin.com', () => {
-    expect(isFeedUrl('https://www.linkedin.com/feed/')).toBe(true);
-    expect(isFeedUrl('https://linkedin.com/feed')).toBe(true);
-    expect(isFeedUrl('https://www.linkedin.com/feed/?trk=x')).toBe(true); // query ignored
-  });
-
-  it('rejects private surfaces and other hosts', () => {
-    expect(isFeedUrl('https://www.linkedin.com/messaging/')).toBe(false);
-    expect(isFeedUrl('https://www.linkedin.com/notifications/')).toBe(false);
-    expect(isFeedUrl('https://evil.example.com/feed/')).toBe(false);
-    expect(isFeedUrl('not a url')).toBe(false);
   });
 });
 
