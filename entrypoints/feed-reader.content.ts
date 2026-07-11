@@ -1,4 +1,4 @@
-import { postCapture, postHello, readBridgeMessage } from '@/shared/window-bridge';
+import { postCaptureAll, postHello, readBridgeMessage } from '@/shared/window-bridge';
 import { assemblePost, type AssembleContext } from './content/feed/assemble';
 import { collectPosts, createCollectState } from './content/feed/collect';
 import { findFeedRoot, findPermalinkPostNode, findPostNodes } from './content/feed/nodes';
@@ -45,12 +45,12 @@ export default defineContentScript({
           (node) => assemblePost(node, extractActivityUrn(node), context),
           collectState,
         );
-        if (posts.length > 0) postCapture(posts);
+        if (posts.length > 0) postCaptureAll(posts);
       } else if (kind === 'permalink') {
         const post = findPermalinkPostNode(document);
         if (!post) return; // detail not hydrated yet — retried on the next settle
         const posts = collectPosts([post], assemblePermalink, collectState);
-        if (posts.length > 0) postCapture(posts);
+        if (posts.length > 0) postCaptureAll(posts);
       }
     };
 

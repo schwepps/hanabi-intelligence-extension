@@ -19,6 +19,7 @@ export default tseslint.config(
       'entrypoints/feed-reader.content.ts',
       'entrypoints/content/feed/**/*.ts',
       'entrypoints/content/dom.ts',
+      'entrypoints/content/gate.ts',
       'entrypoints/content/observer.ts',
       'entrypoints/content/parse/**/*.ts',
     ],

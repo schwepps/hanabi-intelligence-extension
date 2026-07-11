@@ -3,7 +3,9 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   BRIDGE_SOURCE,
   isValidCapturedPost,
+  MAX_CAPTURE_POSTS,
   postCapture,
+  postCaptureAll,
   postControl,
   postHello,
   readBridgeMessage,
@@ -51,6 +53,22 @@ describe('post helpers', () => {
       enabled: true,
     });
     expect(spy.mock.calls[2]?.[0]).toMatchObject({ source: BRIDGE_SOURCE, kind: 'capture' });
+    spy.mockRestore();
+  });
+
+  it('postCaptureAll splits an over-cap batch into within-cap capture messages (no silent drop)', () => {
+    const spy = vi.spyOn(window, 'postMessage').mockImplementation(() => {});
+    const posts = Array.from({ length: 2 * MAX_CAPTURE_POSTS + 50 }, (_, i) =>
+      stubPayload({ linkedin_post_id: `urn:li:activity:${i}` }),
+    );
+    postCaptureAll(posts);
+    const chunks = spy.mock.calls
+      .map((call) => call[0] as { kind: string; posts: unknown[] })
+      .filter((message) => message.kind === 'capture')
+      .map((message) => message.posts.length);
+    // Every chunk is within the anti-forge cap, and together they cover all 250 posts.
+    expect(chunks).toEqual([MAX_CAPTURE_POSTS, MAX_CAPTURE_POSTS, 50]);
+    expect(chunks.reduce((a, b) => a + b, 0)).toBe(posts.length);
     spy.mockRestore();
   });
 });

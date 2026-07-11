@@ -51,6 +51,18 @@ export function postControl(enabled: boolean): void {
 export function postCapture(posts: PostPayload[]): void {
   post({ source: BRIDGE_SOURCE, kind: 'capture', posts });
 }
+/**
+ * Post captures split into `MAX_CAPTURE_POSTS`-sized messages. The isolated side caps each capture
+ * message at `MAX_CAPTURE_POSTS` (the anti-forge volume guard) while the MAIN reader marks every
+ * emitted node done and never re-walks it — so a single scan yielding more than the cap must be
+ * chunked here, else the overflow is validated away on receipt and lost. Each chunk is itself a
+ * valid, within-cap capture message.
+ */
+export function postCaptureAll(posts: PostPayload[]): void {
+  for (let i = 0; i < posts.length; i += MAX_CAPTURE_POSTS) {
+    postCapture(posts.slice(i, i + MAX_CAPTURE_POSTS));
+  }
+}
 
 /**
  * Narrow a `message` event to a same-window, same-origin bridge message, runtime-validating the
